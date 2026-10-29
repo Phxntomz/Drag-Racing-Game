@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bimmer strip</title>
+    <link rel="icon" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="css/motosphere.css" />
+    <link rel="stylesheet" href="css/game.css" />
+  </head>
+  <body class="ms-app">
+    <header class="ms-nav">
+      <div class="ms-nav-inner">
+        <a class="ms-brand" href="#garage" id="brand">Bimmer strip</a>
+        <input class="ms-search" id="search" type="search" placeholder="Search chassis or engine…" />
+        <div class="ms-nav-actions">
+          <span class="cash" id="cash">$0</span>
+          <button class="ms-btn ms-btn-ghost" id="mute" type="button">Sound on</button>
+        </div>
+        <nav class="ms-tabs" aria-label="Primary">
+          <a href="#garage" data-view="garage">Garage</a>
+          <a href="#tune" data-view="tune">Tune</a>
+          <a href="#strip" data-view="strip">Strip</a>
+          <a href="#slips" data-view="slips">Timeslips</a>
+          <a href="#paddock" data-view="paddock">Paddock</a>
+        </nav>
+      </div>
+    </header>
+    <main class="ms-page" id="app"></main>
+    <footer class="ms-foot">
+      <div class="ms-foot-inner">
+        <span class="ms-brand">Bimmer strip</span>
+        <div class="foot-links" id="sources"></div>
+        <button class="ms-btn ms-btn-ghost" id="reset" type="button">Reset paddock</button>
+      </div>
+    </footer>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

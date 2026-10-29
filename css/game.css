@@ -1,0 +1,303 @@
+.ms-app a.ms-brand {
+  color: var(--ms-ink);
+}
+
+.ms-foot .ms-foot-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cash {
+  color: var(--ms-ink);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.stack {
+  display: grid;
+  gap: 16px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  gap: 16px;
+}
+
+.split-even {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.grow {
+  flex: 1;
+}
+
+.stat-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-line span:last-child {
+  color: var(--ms-ink);
+}
+
+.preview {
+  width: 100%;
+  height: 210px;
+  display: block;
+}
+
+.dyno {
+  width: 100%;
+  height: 280px;
+  display: block;
+}
+
+.race-canvas {
+  width: 100%;
+  height: 320px;
+  display: block;
+  background: #141414;
+  border-radius: 12px;
+}
+
+.ms-tabs a:focus-visible {
+  outline: 2px solid var(--ms-focus);
+  outline-offset: 3px;
+}
+
+.strip-board {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.bulb {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.bulb.pre.on,
+.bulb.stage.on {
+  background: var(--ms-primary);
+}
+
+.bulb.amber.on {
+  background: #e6b325;
+}
+
+.bulb.green.on {
+  background: var(--ms-hit);
+}
+
+.bulb.red.on {
+  background: var(--ms-miss);
+}
+
+.tach {
+  position: relative;
+  height: 14px;
+  margin-top: 12px;
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.tach-fill {
+  height: 100%;
+  width: 0;
+  background: #f1f1f1;
+}
+
+.tach.limit .tach-fill {
+  background: var(--ms-miss);
+}
+
+.tach-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #4da3ff;
+}
+
+.readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: var(--ms-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.part {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.part h3 {
+  margin: 0 0 4px;
+  color: var(--ms-ink);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.part p {
+  margin: 0 0 8px;
+  color: var(--ms-faint);
+  font-size: 0.92rem;
+}
+
+.slider-block {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.slider-block input[type="range"] {
+  width: 100%;
+  accent-color: #4da3ff;
+}
+
+.car-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.car-pick {
+  text-align: left;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.car-pick.is-selected {
+  outline: 2px solid var(--ms-focus);
+  outline-offset: 2px;
+}
+
+.notice {
+  color: var(--ms-ink);
+}
+
+.slip-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 4px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.slip-grid b {
+  color: var(--ms-ink);
+  font-weight: 650;
+}
+
+.warn {
+  margin: 8px 0 0;
+  color: var(--ms-dim);
+}
+
+.foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  grid-column: 1 / -1;
+}
+
+.pedals {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ms-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pedals .ms-btn {
+  min-width: 108px;
+  min-height: 44px;
+}
+
+label.ms-eyebrow {
+  display: block;
+}
+
+@media (max-width: 860px) {
+  .split,
+  .split-even,
+  .strip-board {
+    grid-template-columns: 1fr;
+  }
+
+  .tree {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 0;
+  }
+
+  .race-canvas {
+    height: 240px;
+  }
+
+  .ms-nav-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ms-nav-actions {
+    margin-left: auto;
+  }
+
+  .ms-search {
+    order: 3;
+    width: 100%;
+    max-width: none;
+  }
+
+  .ms-tabs {
+    order: 4;
+    width: 100%;
+    overflow-x: auto;
+    gap: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-btn,
+  .ms-chip {
+    transition: none;
+  }
+}
