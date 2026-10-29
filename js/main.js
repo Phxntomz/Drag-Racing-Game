@@ -14,6 +14,7 @@ import {
   unmetRequires,
 } from "./data.js";
 import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js";
+import { artKind, partFigure } from "./art.js";
 import { cameraFor, drawCar, drawDyno, drawStrip } from "./draw.js";
 import {
   EIGHTH,
@@ -45,6 +46,8 @@ if (!["garage", "tune", "strip", "slips", "paddock"].includes(view)) view = "gar
 let era = "all";
 let classId = "street";
 let treeMode = "full";
+let shopSection = "maps";
+let pendingMap = null;
 let notice = "";
 let night = null;
 let race = null;
@@ -148,10 +151,9 @@ function go(next) {
 }
 
 function paint() {
-  document.querySelectorAll(".ms-tabs a").forEach((link) => {
+  document.querySelectorAll(".nav a").forEach((link) => {
     const on = link.dataset.view === view;
     link.setAttribute("aria-current", on ? "page" : "false");
-    link.classList.toggle("is-active", on);
   });
   cashEl.textContent = money(save.cash);
   app.replaceChildren();
@@ -165,192 +167,132 @@ function paint() {
 function renderGarage() {
   const item = owned();
   const { car, spec, slip } = preview(item);
-  const hero = el("section", { class: "ms-hero" }, [
-    el("p", { class: "ms-eyebrow" }, "Garage"),
-    el("h1", { class: "ms-h1" }, item.name),
-    el("p", { class: "ms-lead" }, "Every car on this property is a BMW. The drawings are original side views scaled from published length, height, and wheelbase."),
-  ]);
-  const canvas = el("canvas", { class: "preview", id: "hero-car" });
-  hero.append(canvas);
-  const rename = el("input", { class: "ms-field", id: "rename", value: item.name, maxlength: "32" });
+  app.append(head("Garage", item.name, `${car.year} ${car.chassis}. ${car.blurb}`));
+
+  const studio = el("canvas", { class: "studio", id: "hero-car" });
+  const rename = el("input", { class: "field", id: "rename", value: item.name, maxlength: "32" });
   rename.addEventListener("change", () => {
     item.name = rename.value.trim() || car.name;
     persist();
     paint();
   });
-  hero.append(el("div", { class: "stack", style: "margin-top:14px" }, [
-    el("label", { class: "ms-eyebrow", for: "rename" }, "Name"),
-    rename,
-  ]));
-  const colors = el("div", { class: "row", style: "margin-top:12px" });
-  for (const paint of PAINTS) {
+  const colors = el("div", { class: "row swatches" });
+  for (const color of PAINTS) {
     const chip = el("button", {
-      class: `ms-chip${item.paint === paint.id ? " is-active" : ""}`,
+      class: `swatch${item.paint === color.id ? " is-on" : ""}`,
       type: "button",
-      "aria-pressed": item.paint === paint.id ? "true" : "false",
-    }, paint.name);
+      title: color.name,
+      "aria-label": color.name,
+      "aria-pressed": item.paint === color.id ? "true" : "false",
+      style: `background:${color.hex}`,
+    });
     chip.addEventListener("click", () => {
-      item.paint = paint.id;
+      item.paint = color.id;
       persist();
       paint();
     });
     colors.append(chip);
   }
-  hero.append(colors);
+  const bay = el("div", { class: "panel" }, [
+    studio,
+    colors,
+    el("label", { class: "kicker", for: "rename", style: "display:block;margin-top:14px" }, "Name on the slip"),
+    rename,
+  ]);
 
-  const facts = el("div", { class: "ms-card" }, [
-    el("p", { class: "ms-eyebrow" }, "Factory sheet"),
-    line("Car", `${car.year} BMW ${car.chassis} ${car.name}`),
+  const facts = el("div", { class: "panel" }, [
+    el("p", { class: "kicker" }, "Window sticker"),
+    line("Car", `${car.year} ${car.chassis} ${car.name}`),
     line("Engine", `${car.engine} · ${car.aspiration}`),
-    line("Output", `${car.hp} hp · ${car.tq} Nm`),
+    line("Factory", `${car.hp} hp · ${car.tq} Nm`),
+    line("This build", `${Math.round(spec.hp)} hp`),
     line("Redline", `${car.redline.toLocaleString("en-US")} rpm`),
-    line("Weight", `${car.mass.toLocaleString("en-US")} kg`),
+    line("Weight", `${Math.round(spec.mass).toLocaleString("en-US")} kg`),
     line("Gearbox", transLabel(car.trans)),
-    line("Published quarter", car.published),
-    el("p", { class: "ms-lead" }, car.blurb),
-    el("p", { class: "ms-lead" }, `In this build, a perfect leave is ${formatEt(slip.quarter)} at ${slip.quarterMph ? slip.quarterMph.toFixed(1) : "—"} mph. Crank power right now is ${Math.round(spec.hp)} hp.`),
+    line("Perfect pass", slip.quarter ? `${formatEt(slip.quarter)} at ${slip.quarterMph.toFixed(1)} mph` : "Won't finish"),
+    line("Published", car.published),
   ]);
   if (item.damage) {
-    facts.append(el("p", { class: "notice" }, item.damage === "engine" ? "The engine needs a rebuild before it stages again." : "An axle is out. Fix it before the next hit."));
-    const fix = el("button", { class: "ms-btn", type: "button" }, `Repair · ${money(repairCost(item))}`);
-    fix.addEventListener("click", () => repair(item));
-    facts.append(fix);
+    facts.append(el("p", { class: "note" }, item.damage === "engine" ? "The engine needs a rebuild before it stages." : "An axle is out. Fix it before the next hit."));
+    facts.append(button(`Repair · ${money(repairCost(item))}`, () => repair(item), "btn"));
   }
-  const actions = el("div", { class: "row", style: "margin-top:12px" }, [
-    button("Tune this car", () => go("tune"), "ms-btn"),
-    button("Take it to the strip", () => go("strip"), "ms-btn ms-btn-ghost"),
+  const actions = el("div", { class: "row", style: "margin-top:14px" }, [
+    button("Open the shop", () => go("tune"), "btn"),
+    button("Take it to the strip", () => go("strip"), "btn btn-ghost"),
   ]);
-  if (save.cars.length > 1) {
-    actions.append(button("Sell", () => sell(item), "ms-btn ms-btn-danger"));
-  }
+  if (save.cars.length > 1) actions.append(button("Sell", () => sell(item), "btn btn-danger"));
   facts.append(actions);
 
-  const list = el("div", { class: "car-grid" });
+  const list = el("div", { class: "inventory" });
   for (const ownedCar of save.cars.filter((entry) => matches(carById(entry.carId), entry.name))) {
     const info = carById(ownedCar.carId);
-    const card = el("button", { class: `ms-card car-pick${ownedCar.uid === item.uid ? " is-selected" : ""}`, type: "button" }, [
-      el("p", { class: "ms-eyebrow" }, info.chassis),
-      el("h2", { class: "ms-h1", style: "font-size:1.25rem" }, ownedCar.name),
-      el("p", { class: "ms-lead" }, `${info.year} · ${info.engine} · ${className(classForBuild(ownedCar.build))}`),
+    const card = el("button", { class: `panel pick${ownedCar.uid === item.uid ? " is-on" : ""}`, type: "button" }, [
+      el("canvas", {
+        class: "car-art",
+        "data-car": info.id,
+        "data-paint": paintById(ownedCar.paint).hex,
+        "data-induction": String(ownedCar.build.induction || 0),
+        "data-exhaust": String(ownedCar.build.exhaust || 0),
+      }),
+      el("p", { class: "kicker" }, info.chassis),
+      el("h2", {}, ownedCar.name),
+      el("p", {}, `${info.year} · ${info.engine} · ${className(classForBuild(ownedCar.build))}`),
     ]);
     card.addEventListener("click", () => {
       save.active = ownedCar.uid;
+      pendingMap = null;
       persist();
       paint();
     });
     list.append(card);
   }
 
-  app.append(hero, el("div", { class: "split", style: "margin-top:16px" }, [facts, list]));
+  app.append(el("div", { class: "layout" }, [bay, facts]), list);
   requestAnimationFrame(() => {
-    const node = document.getElementById("hero-car");
-    if (!node) return;
-    sizeCanvas(node);
-    const ctx = node.getContext("2d");
-    const cssW = node.clientWidth || 640;
-    const cssH = node.clientHeight || 210;
-    ctx.clearRect(0, 0, cssW, cssH);
-    const px = Math.min(78, (cssW - 48) / car.length);
-    drawCar(ctx, car, paintById(item.paint).hex, 28, cssH * 0.8, px, {
-      tireRadius: spec.tireRadius,
-      induction: item.build.induction,
-      exhaust: item.build.exhaust,
-    });
+    drawHero(item, car, spec);
+    drawMounted();
   });
 }
 
 function renderTune() {
   const item = owned();
-  const { car, spec, slip, setup } = preview(item);
-  app.append(el("section", { class: "ms-hero" }, [
-    el("p", { class: "ms-eyebrow" }, `${className(classForBuild(item.build))} combination`),
-    el("h1", { class: "ms-h1" }, `Tune the ${car.chassis}`),
-    el("p", { class: "ms-lead" }, "Power steps follow published BMW shop paths: flash, breathing, fuel, then turbos or a kit. The dyno is this car's curve, not a catalog horsepower claim."),
+  const { car, spec, slip } = preview(item);
+  const groups = partGroups(car).filter((group) => group.id !== "software" && group.id !== "fuel");
+  if (shopSection !== "maps" && shopSection !== "setup" && !groups.some((group) => group.id === shopSection)) {
+    shopSection = "maps";
+  }
+  app.append(head(
+    "Shop",
+    shopSection === "maps" ? "Maps" : shopSection === "setup" ? "Setup" : groups.find((group) => group.id === shopSection).label,
+    shopSection === "maps"
+      ? "Pick the file that matches the hardware already on the car, then flash it. Fuel is part of the file. Downpipes and headers are not."
+      : shopSection === "setup"
+        ? "Launch, shift, and tire pressure. These stay in the car when you change maps."
+        : `Fits this ${car.chassis}. The price is for this car.`,
+  ));
+  app.append(el("div", { class: "summary" }, [
+    el("span", {}, [el("b", {}, `${Math.round(spec.hp)} hp`), " at the crank"]),
+    el("span", {}, [el("b", {}, slip.quarter ? `${formatEt(slip.quarter)} @ ${slip.quarterMph.toFixed(1)}` : "—"), " perfect pass"]),
+    el("span", {}, [el("b", {}, className(classForBuild(item.build))), " class"]),
   ]));
 
-  const dynoCard = el("div", { class: "ms-card" }, [
-    el("p", { class: "ms-eyebrow" }, "Dyno"),
-    el("canvas", { class: "dyno", id: "dyno" }),
-  ]);
-  const stats = el("div", { id: "tune-stats" });
-  dynoCard.append(stats, el("div", { id: "tune-warn" }));
-  const sliders = el("div", { id: "sliders", style: "margin-top:12px" });
-  dynoCard.append(sliders);
-  sliders.append(slider("Launch rpm", setup.launchRpm, 1400, car.redline - 150, 10, (value) => {
-    item.setup.launchRpm = value;
-    refreshTune(item);
-  }));
-  sliders.append(slider("Shift rpm", setup.shiftRpm, 3000, car.redline, 10, (value) => {
-    item.setup.shiftRpm = value;
-    refreshTune(item);
-  }));
-  sliders.append(slider("Tire pressure", setup.psi, 10, 40, 0.5, (value) => {
-    item.setup.psi = value;
-    refreshTune(item);
-  }, "psi"));
-  if (spec.turbo) {
-    sliders.append(slider("Boost target", setup.boost, 0.9, 1.12, 0.01, (value) => {
-      item.setup.boost = value;
-      refreshTune(item);
-    }, "x"));
-  }
-  if (item.build.gearing) {
-    sliders.append(slider("Final drive trim", setup.fdTrim, 0.9, 1.16, 0.01, (value) => {
-      item.setup.fdTrim = value;
-      refreshTune(item);
-    }, "x"));
-  }
-  const bite = button("Set the launch to the bite", () => {
-    item.setup.launchRpm = spec.suggestedLaunch;
-    item.setup.psi = spec.idealPsi;
-    persist();
-    paint();
-  }, "ms-btn ms-btn-ghost");
-  dynoCard.append(el("div", { class: "row" }, [bite, button("Race this tune", () => go("strip"), "ms-btn")]));
-
-  const parts = el("div", { class: "ms-card", id: "parts" });
-  for (const group of partGroups(car)) {
-    parts.append(el("p", { class: "ms-eyebrow", style: "margin-top:8px" }, group.label));
-    const current = item.build[group.id] || 0;
-    for (const option of group.options) {
-      const block = el("div", { class: "part" }, [
-        el("h3", {}, option.name),
-        el("p", {}, option.note),
-      ]);
-      const row = el("div", { class: "row" });
-      if (option.level === current) {
-        row.append(el("span", { class: "ms-lead" }, "Fitted"));
-        if (option.level > 0) {
-          row.append(button("Remove", () => {
-            save.cash += Math.round(optionCost(car, group.id, option.level) * 0.4);
-            item.build[group.id] = option.level - 1;
-            persist();
-            paint();
-          }, "ms-btn ms-btn-ghost"));
-        }
-      } else if (option.level === current + 1) {
-        const unmet = unmetRequires(car, item.build, group.id, option.level);
-        const cost = optionCost(car, group.id, option.level);
-        const install = button(cost ? `Install · ${money(cost)}` : "Install", () => {
-          if (unmet.length || save.cash < cost) return;
-          save.cash -= cost;
-          item.build[group.id] = option.level;
-          persist();
-          paint();
-        }, "ms-btn ms-btn-ghost");
-        if (unmet.length || save.cash < cost) install.disabled = true;
-        row.append(install);
-        if (unmet.length) row.append(el("span", { class: "ms-lead" }, unmet[0].reason));
-        else if (save.cash < cost) row.append(el("span", { class: "ms-lead" }, "Short on cash."));
-      }
-      block.append(row);
-      parts.append(block);
-    }
+  const rail = el("nav", { class: "rail", "aria-label": "Catalog" });
+  for (const [id, label] of [["maps", "Maps"], ...groups.map((group) => [group.id, group.label]), ["setup", "Setup"]]) {
+    const tab = el("button", { type: "button", class: shopSection === id ? "is-on" : "", "aria-pressed": shopSection === id ? "true" : "false" }, label);
+    tab.addEventListener("click", () => {
+      shopSection = id;
+      paint();
+    });
+    rail.append(tab);
   }
 
-  app.append(el("div", { class: "split", style: "margin-top:16px" }, [dynoCard, parts]));
+  const main = el("div", {});
+  if (shopSection === "maps") main.append(renderMaps(item, car));
+  else if (shopSection === "setup") main.append(renderSetup(item, car, spec));
+  else main.append(renderCatalog(item, car, groups.find((group) => group.id === shopSection)));
+  app.append(el("div", { class: "shop" }, [rail, main]));
   fillTuneStats(item);
-  requestAnimationFrame(() => redrawDyno(item));
+  if (shopSection === "maps" || shopSection === "setup") requestAnimationFrame(() => redrawDyno(item));
 }
 
 function refreshTune(item) {
@@ -390,49 +332,246 @@ function redrawDyno(item) {
   drawDyno(canvas, spec, stockSpec(car));
 }
 
+function mapChoices() {
+  return [
+    { software: 0, fuel: 0, fuelLabel: "93 octane" },
+    { software: 1, fuel: 0, fuelLabel: "93 octane" },
+    { software: 1, fuel: 1, fuelLabel: "E30" },
+    { software: 2, fuel: 0, fuelLabel: "93 octane" },
+    { software: 2, fuel: 1, fuelLabel: "E30" },
+    { software: 2, fuel: 2, fuelLabel: "E85" },
+  ];
+}
+
+function mapTitle(software) {
+  if (software === 0) return "Stock";
+  if (software === 1) return "Stage 1";
+  return "Stage 2";
+}
+
+function deltaCost(car, build, slot, target) {
+  const from = build[slot] || 0;
+  if (target === from) return 0;
+  if (target > from) {
+    let total = 0;
+    for (let level = from + 1; level <= target; level += 1) total += optionCost(car, slot, level);
+    return total;
+  }
+  let refund = 0;
+  for (let level = target + 1; level <= from; level += 1) refund += Math.round(optionCost(car, slot, level) * 0.4);
+  return -refund;
+}
+
+function renderMaps(item, car) {
+  const turbo = Boolean(car.turbo || car.spoolRpm);
+  const choices = mapChoices();
+  const selected = pendingMap || { software: item.build.software || 0, fuel: item.build.fuel || 0 };
+  const list = el("div", { class: "map-list" });
+  const query = search.value.trim().toLowerCase();
+  for (const choice of choices) {
+    const software = partGroups(car).find((group) => group.id === "software").options[choice.software];
+    const fuel = partGroups(car).find((group) => group.id === "fuel").options[choice.fuel];
+    const title = `${mapTitle(choice.software)} · ${choice.fuelLabel}`;
+    if (query && !`${title} ${software.note} ${fuel.note}`.toLowerCase().includes(query)) continue;
+    const build = { ...item.build, software: choice.software, fuel: choice.fuel };
+    if (choice.software >= 2 && (build.exhaust || 0) < 1) build.exhaust = 1;
+    const spec = compile(car, build, item.setup, 0);
+    const on = selected.software === choice.software && selected.fuel === choice.fuel;
+    const hardware = choice.software >= 2
+      ? (turbo ? "Needs high-flow downpipes on the car before this file." : "Needs headers on the car before this file.")
+      : "Runs on the factory exhaust.";
+    const fuelLine = choice.fuel === 0
+      ? "Pump gas. Factory pumps."
+      : choice.fuel === 1
+        ? "The file includes pumps for an E30 mix."
+        : "The file includes port injection and an E85 calibration.";
+    const card = el("button", {
+      class: `map${on ? " is-on" : ""}`,
+      type: "button",
+      "aria-pressed": on ? "true" : "false",
+    }, [
+      partFigure("ecu", choice.software + choice.fuel),
+      el("div", { class: "map-copy" }, [
+        el("strong", {}, title),
+        el("p", {}, `${Math.round(spec.hp)} hp on this ${car.chassis}. ${software.note.split(". ")[0].replace(/\.$/, "")}.`),
+        el("p", {}, `${hardware} ${fuelLine}`),
+      ]),
+    ]);
+    card.addEventListener("click", () => {
+      pendingMap = { software: choice.software, fuel: choice.fuel };
+      paint();
+    });
+    list.append(card);
+  }
+  if (!list.childElementCount) list.append(el("p", { class: "empty" }, "No map matches that search."));
+
+  const same = selected.software === (item.build.software || 0) && selected.fuel === (item.build.fuel || 0);
+  const unmet = [
+    ...unmetRequires(car, item.build, "software", selected.software),
+    ...unmetRequires(car, item.build, "fuel", selected.fuel),
+  ];
+  const cost = deltaCost(car, item.build, "software", selected.software) + deltaCost(car, item.build, "fuel", selected.fuel);
+  let label = "On the car";
+  if (!same) label = cost > 0 ? `Flash · ${money(cost)}` : cost < 0 ? `Flash · refund ${money(-cost)}` : "Flash";
+  const flash = button(label, () => {
+    if (same || unmet.length || cost > save.cash) return;
+    save.cash -= cost;
+    item.build.software = selected.software;
+    item.build.fuel = selected.fuel;
+    pendingMap = null;
+    persist();
+    paint();
+  }, "btn");
+  if (same || unmet.length || cost > save.cash) flash.disabled = true;
+  const bar = el("div", { class: "flashbar" }, [flash, button("Race this tune", () => go("strip"), "btn btn-ghost")]);
+  if (unmet.length) bar.append(el("span", { class: "note" }, unmet[0].reason));
+  else if (!same && cost > save.cash) bar.append(el("span", { class: "note" }, "Short on cash."));
+
+  const dyno = el("div", { class: "panel", style: "margin-top:12px" }, [
+    el("p", { class: "kicker" }, "Dyno, current file"),
+    el("canvas", { class: "dyno", id: "dyno" }),
+    el("div", { id: "tune-stats" }),
+    el("div", { id: "tune-warn" }),
+  ]);
+  return el("div", {}, [list, bar, dyno]);
+}
+
+function renderSetup(item, car, spec) {
+  const { setup } = preview(item);
+  const panel = el("div", { class: "panel" }, [
+    el("p", { class: "kicker" }, "At the line"),
+    el("canvas", { class: "dyno", id: "dyno" }),
+    el("div", { id: "tune-stats" }),
+    el("div", { id: "tune-warn" }),
+  ]);
+  panel.append(slider("Launch rpm", setup.launchRpm, 1400, car.redline - 150, 10, (value) => {
+    item.setup.launchRpm = value;
+    refreshTune(item);
+  }));
+  panel.append(slider("Shift rpm", setup.shiftRpm, 3000, car.redline, 10, (value) => {
+    item.setup.shiftRpm = value;
+    refreshTune(item);
+  }));
+  panel.append(slider("Tire pressure", setup.psi, 10, 40, 0.5, (value) => {
+    item.setup.psi = value;
+    refreshTune(item);
+  }, "psi"));
+  if (spec.turbo) {
+    panel.append(slider("Boost target", setup.boost, 0.9, 1.12, 0.01, (value) => {
+      item.setup.boost = value;
+      refreshTune(item);
+    }, "x"));
+  }
+  if (item.build.gearing) {
+    panel.append(slider("Final drive trim", setup.fdTrim, 0.9, 1.16, 0.01, (value) => {
+      item.setup.fdTrim = value;
+      refreshTune(item);
+    }, "x"));
+  }
+  panel.append(el("div", { class: "row", style: "margin-top:14px" }, [
+    button("Set the launch to the bite", () => {
+      item.setup.launchRpm = spec.suggestedLaunch;
+      item.setup.psi = spec.idealPsi;
+      persist();
+      paint();
+    }, "btn btn-ghost"),
+    button("Race this tune", () => go("strip"), "btn"),
+  ]));
+  return panel;
+}
+
+function renderCatalog(item, car, group) {
+  const turbo = Boolean(car.turbo || car.spoolRpm);
+  const current = item.build[group.id] || 0;
+  const query = search.value.trim().toLowerCase();
+  const grid = el("div", { class: "catalog" });
+  for (const option of group.options) {
+    if (query && !`${option.name} ${option.note} ${group.label}`.toLowerCase().includes(query)) continue;
+    const card = el("article", { class: "panel product" }, [
+      partFigure(artKind(group.id, option.level, turbo)),
+      el("h2", {}, option.name),
+      el("p", {}, option.note),
+    ]);
+    const row = el("div", { class: "row" });
+    const price = option.level === 0 ? null : optionCost(car, group.id, option.level);
+    if (price) row.append(el("span", { class: "price" }, money(price)));
+    if (option.level === current) {
+      row.append(el("span", { class: "kicker" }, "On the car"));
+      if (option.level > 0) {
+        row.append(button("Remove", () => {
+          save.cash += Math.round(optionCost(car, group.id, option.level) * 0.4);
+          item.build[group.id] = option.level - 1;
+          persist();
+          paint();
+        }, "btn btn-ghost"));
+      }
+    } else if (option.level === current + 1) {
+      const unmet = unmetRequires(car, item.build, group.id, option.level);
+      const cost = optionCost(car, group.id, option.level);
+      const install = button(cost ? "Add to car" : "Add to car", () => {
+        if (unmet.length || save.cash < cost) return;
+        save.cash -= cost;
+        item.build[group.id] = option.level;
+        persist();
+        paint();
+      }, "btn");
+      if (unmet.length || save.cash < cost) install.disabled = true;
+      row.append(install);
+      if (unmet.length) card.append(el("p", { class: "note" }, unmet[0].reason));
+      else if (save.cash < cost) card.append(el("p", { class: "note" }, "Short on cash."));
+    } else if (option.level > current + 1) {
+      card.append(el("p", { class: "note" }, "Fit the step before this one."));
+    }
+    card.append(row);
+    grid.append(card);
+  }
+  if (!grid.childElementCount) grid.append(el("p", { class: "empty" }, "Nothing in this category matches."));
+  return grid;
+}
+
 function renderStrip() {
   const item = owned();
   const { car, spec, slip } = preview(item);
   const legal = canEnter(item.build, classId);
   if (!night || night.classId !== classId || night.against !== item.uid) rollNight();
 
-  app.append(el("section", { class: "ms-hero" }, [
-    el("p", { class: "ms-eyebrow" }, "Strip"),
-    el("h1", { class: "ms-h1" }, "Stage it"),
-    el("p", { class: "ms-lead" }, "Full tree is a 0.500 cadence. Pro tree is 0.400. Space or Launch on the last amber is a red light. Manuals shift with Shift or the up arrow. DCT, ZF, and SMG cars shift themselves at the light you set."),
-  ]));
+  const shiftHint = spec.autoShift
+    ? "This gearbox shifts itself at the rpm you set in the shop."
+    : "Shift or the up arrow grabs the next gear. Space launches.";
+  app.append(head("Strip", item.name, `Full tree is a 0.500 cadence. Pro tree is 0.400. Leave on the last amber and it is a red light. ${shiftHint}`));
 
-  const tree = el("div", { class: "tree", id: "tree" }, [
+  const tree = el("div", { class: "tree-box", id: "tree" }, [
     bulb("pre"), bulb("stage"), bulb("amber"), bulb("amber"), bulb("amber"), bulb("green"), bulb("red"),
   ]);
   const canvas = el("canvas", { class: "race-canvas", id: "race" });
-  const readout = el("div", { class: "readout", id: "readout" }, [
-    el("span", { id: "gear" }, "Gear —"),
-    el("span", { id: "speed" }, "0 mph"),
-    el("span", { id: "rpm" }, "0 rpm"),
-    el("span", { id: "flag" }, ""),
+  const readout = el("div", { class: "dash", id: "readout" }, [
+    cell("Gear", "gear", "—"),
+    cell("Speed", "speed", "0 mph"),
+    cell("Rpm", "rpm", "0 rpm"),
+    cell("Flag", "flag", "—"),
   ]);
   const tach = el("div", { class: "tach", id: "tach" }, [
     el("div", { class: "tach-fill", id: "tach-fill" }),
     el("div", { class: "tach-mark", id: "tach-mark" }),
   ]);
   const pedals = el("div", { class: "pedals", id: "pedals" });
-  const live = el("div", { id: "live", "aria-live": "polite" });
-  const board = el("div", { class: "ms-card" }, [
-    el("div", { class: "strip-board" }, [tree, el("div", {}, [canvas, tach, readout, pedals])]),
+  const live = el("div", { class: "live", id: "live", "aria-live": "polite" });
+  const board = el("div", { class: "lane" }, [
+    el("div", { class: "lane-grid" }, [tree, el("div", {}, [canvas, tach, readout, pedals])]),
     live,
     el("div", { id: "result" }),
   ]);
 
-  const side = el("div", { class: "ms-card" }, [
-    el("p", { class: "ms-eyebrow" }, "Class"),
-    el("div", { class: "row", id: "class-row" }),
-    el("div", { class: "row", id: "tree-row", style: "margin-top:8px" }),
-    el("div", { id: "rival-card", style: "margin-top:12px" }),
+  const side = el("div", { class: "panel" }, [
+    el("p", { class: "kicker" }, "Class"),
+    el("div", { class: "segment", id: "class-row" }),
+    el("p", { class: "kicker", style: "margin-top:14px" }, "Tree"),
+    el("div", { class: "segment", id: "tree-row" }),
+    el("div", { id: "rival-card", style: "margin-top:14px" }),
   ]);
-  if (notice) side.append(el("p", { class: "notice" }, notice));
+  if (notice) side.append(el("p", { class: "note" }, notice));
 
-  app.append(el("div", { class: "split", style: "margin-top:16px" }, [board, side]));
+  app.append(el("div", { class: "layout layout-strip" }, [board, side]));
   fillClassChips();
   fillRival(item, spec, slip, legal);
   armPedals(item, legal);
@@ -445,7 +584,7 @@ function fillClassChips() {
   row.replaceChildren();
   for (const entry of CLASSES) {
     const chip = el("button", {
-      class: `ms-chip${classId === entry.id ? " is-active" : ""}`,
+      class: classId === entry.id ? "is-on" : "",
       type: "button",
       "aria-pressed": classId === entry.id ? "true" : "false",
     }, entry.name);
@@ -459,7 +598,7 @@ function fillClassChips() {
   trees.replaceChildren();
   for (const mode of [["full", "Full tree"], ["pro", "Pro tree"]]) {
     const chip = el("button", {
-      class: `ms-chip${treeMode === mode[0] ? " is-active" : ""}`,
+      class: treeMode === mode[0] ? "is-on" : "",
       type: "button",
       "aria-pressed": treeMode === mode[0] ? "true" : "false",
     }, mode[1]);
@@ -475,37 +614,37 @@ function fillRival(item, spec, slip, legal) {
   const card = document.getElementById("rival-card");
   const entry = CLASSES.find((row) => row.id === classId);
   card.replaceChildren(
-    el("p", { class: "ms-eyebrow" }, "Your pace"),
+    el("p", { class: "kicker" }, "Your pace"),
     line("Vehicle ET", slip.quarter ? `${formatEt(slip.quarter)} @ ${slip.quarterMph.toFixed(1)}` : "—"),
     line("60 foot", formatEt(slip.ft60)),
     line("Power", `${Math.round(spec.hp)} hp`),
-    el("p", { class: "ms-lead" }, entry.blurb),
-    el("p", { class: "ms-lead" }, `Buy-in ${money(entry.entry)} · win ${money(entry.purse)} · a loss returns ${money(Math.round(entry.entry * 0.35))}.`),
+    el("p", { class: "lead" }, entry.blurb),
+    el("p", { class: "lead" }, `Buy-in ${money(entry.entry)} · win ${money(entry.purse)} · a loss returns ${money(Math.round(entry.entry * 0.35))}.`),
   );
   if (!legal) {
-    card.append(el("p", { class: "notice" }, `This combination is filed as ${className(classForBuild(item.build))}.`));
+    card.append(el("p", { class: "note" }, `This combination is filed as ${className(classForBuild(item.build))}.`));
   }
   if (night) {
     card.append(
-      el("p", { class: "ms-eyebrow", style: "margin-top:12px" }, "In the other lane"),
+      el("p", { class: "kicker", style: "margin-top:12px" }, "Other lane"),
       line("Car", `${night.car.year} ${night.car.chassis} ${night.car.name}`),
       line("Power", `${Math.round(night.spec.hp)} hp`),
       line("Pace", `${formatEt(night.slip.quarter)} @ ${night.slip.quarterMph.toFixed(1)}`),
-      el("p", { class: "ms-lead" }, "Their light is hidden. A better reaction beats a slightly quicker car."),
+      el("p", { class: "lead" }, "Their light is hidden. A better reaction beats a slightly quicker car."),
     );
   }
-  const row = el("div", { class: "row" });
+  const row = el("div", { class: "row", style: "margin-top:12px" });
   row.append(button("New opponent", () => {
     night = null;
     rollNight();
     paint();
-  }, "ms-btn ms-btn-ghost"));
+  }, "btn btn-ghost"));
   if (item.heat) {
     row.append(button("Cool the car", () => {
       item.heat = 0;
       persist();
       paint();
-    }, "ms-btn ms-btn-ghost"));
+    }, "btn btn-ghost"));
   }
   card.append(row);
 }
@@ -513,8 +652,8 @@ function fillRival(item, spec, slip, legal) {
 function armPedals(item, legal) {
   const pedals = document.getElementById("pedals");
   const entry = CLASSES.find((row) => row.id === classId);
-  const practice = button("Test hit", () => startRace("practice"), "ms-btn ms-btn-ghost");
-  const buy = button(`Buy in · ${money(entry.entry)}`, () => startRace("race"), "ms-btn");
+  const practice = button("Test hit", () => startRace("practice"), "btn btn-ghost");
+  const buy = button(`Buy in · ${money(entry.entry)}`, () => startRace("race"), "btn");
   if (item.damage) {
     practice.disabled = true;
     buy.disabled = true;
@@ -589,9 +728,9 @@ function startRace(mode) {
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(loop);
   const pedals = document.getElementById("pedals");
-  const waiting = button("Wait for the tree", () => {}, "ms-btn");
+  const waiting = button("Wait for the tree", () => {}, "btn");
   waiting.disabled = true;
-  pedals.replaceChildren(waiting, button("Shift", requestShift, "ms-btn ms-btn-ghost"));
+  pedals.replaceChildren(waiting, button("Shift", requestShift, "btn btn-ghost"));
   document.getElementById("result")?.replaceChildren();
   document.getElementById("live").textContent = "Staged. Wait for the tree.";
 }
@@ -646,8 +785,8 @@ function tick(dt) {
         const pedals = document.getElementById("pedals");
         if (pedals) {
           pedals.replaceChildren(
-            button("Launch", requestLaunch, "ms-btn"),
-            button("Shift", requestShift, "ms-btn ms-btn-ghost"),
+            button("Launch", requestLaunch, "btn"),
+            button("Shift", requestShift, "btn btn-ghost"),
           );
         }
       }
@@ -762,16 +901,16 @@ function finish() {
   const notes = coachNotes(race.player.spec, slip, item.setup);
   const result = document.getElementById("result");
   const heading = outcome === "win" ? "Win" : outcome === "loss" ? "Loss" : "Timeslip";
-  result.replaceChildren(el("div", { class: "ms-card", style: "margin-top:12px" }, [
-    el("p", { class: "ms-eyebrow" }, heading),
-    el("h2", { class: "ms-h1" }, slip.quarter ? `${formatEt(slip.quarter)} at ${slip.quarterMph.toFixed(1)} mph` : "No finish"),
+  result.replaceChildren(el("div", { class: "panel", style: "margin-top:12px;background:#fff;color:#17191d" }, [
+    el("p", { class: "kicker" }, heading),
+    el("h2", { class: "title" }, slip.quarter ? `${formatEt(slip.quarter)} at ${slip.quarterMph.toFixed(1)} mph` : "No finish"),
     renderSlipTable(slip, rivalSlip),
-    ...notes.map((note) => el("p", { class: "ms-lead" }, note)),
-    el("div", { class: "row" }, [
+    ...notes.map((note) => el("p", { class: "lead" }, note)),
+    el("div", { class: "row", style: "margin-top:12px" }, [
       button("Run it back", () => {
         race = null;
         paint();
-      }, "ms-btn"),
+      }, "btn"),
     ]),
   ]));
   document.getElementById("live").textContent = `${heading}. ${notes[0] || ""}`;
@@ -875,10 +1014,10 @@ function paintReadout() {
   const mark = document.getElementById("tach-mark");
   const tach = document.getElementById("tach");
   if (!gear) return;
-  gear.textContent = state.launched ? `Gear ${state.gear}` : "Staged";
+  gear.textContent = state.launched ? String(state.gear) : "—";
   speed.textContent = `${Math.round(state.v * 2.23694)} mph`;
   rpm.textContent = `${Math.round(state.rpm)} rpm`;
-  flag.textContent = race.red ? "Red light" : state.spin ? "Tires loose" : state.knock > 0.45 ? "Knock" : state.shiftLeft > 0 ? "Shift" : "";
+  flag.textContent = race.red ? "Red light" : state.spin ? "Tires loose" : state.knock > 0.45 ? "Knock" : state.shiftLeft > 0 ? "Shift" : "—";
   const ratio = Math.max(0, Math.min(1, state.rpm / spec.redline));
   fill.style.width = `${ratio * 100}%`;
   mark.style.left = `${(spec.shiftRpm / spec.redline) * 100}%`;
@@ -996,44 +1135,40 @@ function rollRt(level) {
 }
 
 function renderSlips() {
-  app.append(el("section", { class: "ms-hero" }, [
-    el("p", { class: "ms-eyebrow" }, "Timeslips"),
-    el("h1", { class: "ms-h1" }, "What the clocks caught"),
-    el("p", { class: "ms-lead" }, "Reaction is included in the elapsed time, the way a real slip is written."),
-  ]));
+  app.append(head("Slips", "Timeslips", "Reaction is included in the elapsed time, the way a real slip is written."));
   const q = search.value.trim().toLowerCase();
   const rows = save.slips.filter((slip) => !q || `${slip.car} ${slip.chassis} ${slip.rival}`.toLowerCase().includes(q));
-  const table = el("table", { class: "ms-table" }, [
-    el("thead", {}, el("tr", {}, ["When it was", "Car", "Class", "R/T", "60 ft", "1/4", "Mph", "Result"].map((label) => el("th", {}, label)))),
-  ]);
-  const body = el("tbody");
+  const list = el("div", { class: "slip-list" });
+  if (!rows.length) {
+    list.append(el("p", { class: "empty" }, "No slips yet. Stage the car."));
+  }
   for (const slip of rows) {
-    body.append(el("tr", {}, [
-      el("td", {}, slip.mode === "practice" ? "Test" : "Race"),
-      el("td", {}, slip.car),
-      el("td", {}, className(slip.classId)),
-      el("td", {}, slip.rt == null ? "—" : Number(slip.rt).toFixed(3)),
-      el("td", {}, formatEt(slip.ft60)),
-      el("td", {}, formatEt(slip.quarter)),
-      el("td", {}, slip.mph ? Number(slip.mph).toFixed(1) : "—"),
-      el("td", {}, slip.outcome === "win" ? "Win" : slip.outcome === "loss" ? "Loss" : "Time"),
+    const outcome = slip.outcome === "win" ? "Win" : slip.outcome === "loss" ? "Loss" : "Time";
+    list.append(el("article", { class: "panel slip" }, [
+      el("div", {}, [
+        el("p", { class: "kicker" }, `${slip.mode === "practice" ? "Test" : "Race"} · ${slip.chassis}`),
+        el("div", { class: "et" }, formatEt(slip.quarter)),
+        el("p", { class: "lead" }, slip.mph ? `${Number(slip.mph).toFixed(1)} mph` : "No finish"),
+      ]),
+      el("div", { class: "slip-grid" }, [
+        el("span", {}, "R/T"), el("b", {}, slip.rt == null ? "—" : Number(slip.rt).toFixed(3)), el("span", {}, ""),
+        el("span", {}, "60 ft"), el("b", {}, formatEt(slip.ft60)), el("span", {}, ""),
+        el("span", {}, "Car"), el("b", {}, slip.car), el("span", {}, className(slip.classId)),
+        el("span", {}, "Lane"), el("b", {}, slip.rival || "Solo"), el("span", {}, ""),
+      ]),
+      el("span", { class: `tag ${slip.outcome || ""}` }, outcome),
     ]));
   }
-  table.append(body);
-  app.append(el("div", { class: "ms-card", style: "margin-top:16px" }, rows.length ? [table] : [el("p", { class: "ms-lead" }, "No slips yet. Stage the car.")]));
+  app.append(list);
 }
 
 function renderPaddock() {
-  app.append(el("section", { class: "ms-hero" }, [
-    el("p", { class: "ms-eyebrow" }, "Paddock"),
-    el("h1", { class: "ms-h1" }, "Buy another BMW"),
-    el("p", { class: "ms-lead" }, "Prices are game money, ordered like a used lot, not an appraisal. Specs are the factory numbers the model is built from."),
-  ]));
-  const chips = el("div", { class: "row", style: "margin:16px 0" });
+  app.append(head("Lot", "Cars for sale", "Factory cars, game prices. Specs are the numbers the model is built from."));
+  const chips = el("div", { class: "segment" });
   for (const [id, label] of [["all", "All"], ["classic", "Classic"], ["turbo", "Turbo six"], ["v8", "V8 and V10"]]) {
     const chip = el("button", {
-      class: `ms-chip${era === id ? " is-active" : ""}`,
       type: "button",
+      class: era === id ? "is-on" : "",
       "aria-pressed": era === id ? "true" : "false",
     }, label);
     chip.addEventListener("click", () => {
@@ -1043,25 +1178,29 @@ function renderPaddock() {
     chips.append(chip);
   }
   app.append(chips);
-  const grid = el("div", { class: "car-grid" });
-  for (const car of CARS.filter((candidate) => matches(candidate, candidate.name) && (era === "all" || candidate.era === era))) {
+  const grid = el("div", { class: "inventory" });
+  const cars = CARS.filter((candidate) => matches(candidate, candidate.name) && (era === "all" || candidate.era === era));
+  if (!cars.length) grid.append(el("p", { class: "empty" }, "Nothing on the lot matches that search."));
+  for (const car of cars) {
     const ownedAlready = save.cars.some((item) => item.carId === car.id);
-    const card = el("article", { class: "ms-card" }, [
-      el("p", { class: "ms-eyebrow" }, `${car.year} · ${car.chassis}`),
-      el("h2", { class: "ms-h1", style: "font-size:1.3rem" }, `${car.name}`),
-      el("p", { class: "ms-lead" }, `${car.engine} · ${car.hp} hp · ${car.tq} Nm · ${car.mass} kg`),
-      el("p", { class: "ms-lead" }, car.blurb),
-      el("p", { class: "ms-lead" }, car.published),
+    const card = el("article", { class: "panel lot" }, [
+      el("canvas", { class: "car-art", "data-car": car.id, "data-paint": paintById(car.paint).hex }),
+      el("p", { class: "kicker" }, `${car.year} · ${car.chassis}`),
+      el("h2", {}, car.name),
+      el("p", {}, `${car.engine} · ${car.hp} hp · ${car.tq} Nm · ${car.mass} kg`),
+      el("p", {}, car.published),
+      el("span", { class: "price" }, money(car.price)),
     ]);
-    const buy = button(ownedAlready ? "In the garage" : `Buy · ${money(car.price)}`, () => buyCar(car), "ms-btn");
+    const buy = button(ownedAlready ? "In the garage" : "Buy", () => buyCar(car), "btn");
     if (ownedAlready || save.cash < car.price) buy.disabled = true;
     card.append(buy);
     if (!ownedAlready && save.cash < car.price) {
-      card.append(el("p", { class: "ms-lead" }, `${money(car.price - save.cash)} short.`));
+      card.append(el("p", {}, `${money(car.price - save.cash)} short.`));
     }
     grid.append(card);
   }
   app.append(grid);
+  requestAnimationFrame(drawMounted);
 }
 
 function buyCar(car) {
@@ -1147,8 +1286,23 @@ function transLabel(trans) {
   return "Manual";
 }
 
+function head(kicker, title, lead) {
+  return el("header", {}, [
+    el("p", { class: "kicker" }, kicker),
+    el("h1", { class: "title" }, title),
+    lead ? el("p", { class: "lead" }, lead) : null,
+  ]);
+}
+
+function cell(label, id, value) {
+  return el("div", { class: "cell" }, [
+    el("span", {}, label),
+    el("b", { id }, value),
+  ]);
+}
+
 function line(label, value) {
-  return el("div", { class: "stat-line" }, [el("span", {}, label), el("span", {}, value)]);
+  return el("div", { class: "stat" }, [el("span", {}, label), el("span", {}, value)]);
 }
 
 function button(label, onClick, className) {
@@ -1164,14 +1318,14 @@ function bulb(kind) {
 function slider(label, value, min, max, step, onInput, suffix) {
   const id = `s-${label.replace(/\s+/g, "-").toLowerCase()}`;
   const input = el("input", { id, type: "range", min: String(min), max: String(max), step: String(step), value: String(value) });
-  const readout = el("span", { class: "ms-lead", "data-live": label.includes("Final") ? "fd" : "" }, formatSlider(value, suffix));
+  const readout = el("span", { "data-live": label.includes("Final") ? "fd" : "" }, formatSlider(value, suffix));
   input.addEventListener("input", () => {
     const next = Number(input.value);
     readout.textContent = formatSlider(next, suffix);
     onInput(next);
   });
-  return el("div", { class: "slider-block" }, [
-    el("label", { class: "ms-eyebrow", for: id }, label),
+  return el("div", { class: "slider" }, [
+    el("label", { for: id }, label),
     input,
     readout,
   ]);
@@ -1208,24 +1362,59 @@ function sizeCanvas(canvas) {
   canvas.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
+function drawHero(item, car, spec) {
+  const node = document.getElementById("hero-car");
+  if (!node) return;
+  sizeCanvas(node);
+  const ctx = node.getContext("2d");
+  const w = node.clientWidth || 640;
+  const h = node.clientHeight || 240;
+  ctx.clearRect(0, 0, w, h);
+  const px = Math.min((h * 0.62) / car.height, (w - 36) / car.length);
+  drawCar(ctx, car, paintById(item.paint).hex, (w - car.length * px) / 2, h * 0.82, px, {
+    tireRadius: spec.tireRadius,
+    induction: item.build.induction,
+    exhaust: item.build.exhaust,
+  });
+}
+
+function drawMounted() {
+  document.querySelectorAll("canvas.car-art").forEach((node) => {
+    const car = carById(node.dataset.car);
+    if (!car) return;
+    sizeCanvas(node);
+    const ctx = node.getContext("2d");
+    const w = node.clientWidth || 280;
+    const h = node.clientHeight || 128;
+    ctx.clearRect(0, 0, w, h);
+    const px = Math.min((h * 0.7) / car.height, (w - 16) / car.length);
+    drawCar(ctx, car, node.dataset.paint || "#14161c", (w - car.length * px) / 2, h * 0.84, px, {
+      induction: Number(node.dataset.induction || 0),
+      exhaust: Number(node.dataset.exhaust || 0),
+    });
+  });
+}
+
 function bind() {
-  document.querySelectorAll(".ms-tabs a, #brand").forEach((link) => {
+  document.querySelectorAll(".nav a, .wordmark").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
       go(link.dataset.view || "garage");
     });
   });
   search.addEventListener("input", () => {
-    if (view === "garage" || view === "paddock" || view === "slips") paint();
+    if (view === "garage" || view === "paddock" || view === "slips" || view === "tune") paint();
   });
   document.querySelector("#mute").addEventListener("click", () => {
     setMuted(!isMuted());
     document.querySelector("#mute").textContent = isMuted() ? "Sound off" : "Sound on";
+    localStorage.setItem("bimmer-strip-mute", isMuted() ? "1" : "0");
   });
   document.querySelector("#reset").addEventListener("click", () => {
     localStorage.removeItem(KEY);
     save = load();
     night = null;
+    pendingMap = null;
     cancelRace();
     notice = "";
     go("garage");
@@ -1243,6 +1432,13 @@ function bind() {
   window.addEventListener("resize", () => {
     if (view === "strip" && !race) drawIdle();
     if (view === "tune") redrawDyno(owned());
+    if (view === "garage") {
+      const item = owned();
+      const { car, spec } = preview(item);
+      drawHero(item, car, spec);
+      drawMounted();
+    }
+    if (view === "paddock") drawMounted();
   });
   const sources = document.querySelector("#sources");
   for (const source of SOURCES) {
@@ -1253,9 +1449,6 @@ function bind() {
     setMuted(true);
     document.querySelector("#mute").textContent = "Sound off";
   }
-  document.querySelector("#mute").addEventListener("click", () => {
-    localStorage.setItem("bimmer-strip-mute", isMuted() ? "1" : "0");
-  });
 }
 
 bind();

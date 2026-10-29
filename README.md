@@ -12,11 +12,13 @@ python3 -m http.server 8765
 
 Open `http://127.0.0.1:8765`.
 
-- **Garage** picks the car, the paint, and the name.
-- **Tune** buys the ladder: software, breathing, fuel, turbos or a kit, clutch, axles, gearing, weight, and tires. The dyno and the estimated quarter update as you change the launch rpm, shift rpm, tire pressure, boost, and final drive.
+- **Garage** is the car in the bay: paint, name, and the window sticker.
+- **Shop** is the catalog. Maps are flashed like an OTS file (stage, then 93 / E30 / E85). Hardware is a parts grid. Setup holds launch rpm, shift rpm, tire pressure, boost, and final drive.
 - **Strip** is a full 0.500 tree or a 0.400 pro tree. Space launches. Shift or the up arrow grabs the next gear on a manual. DCT, ZF, and SMG cars shift themselves at the rpm you set.
-- **Timeslips** keeps the reaction, 60-foot, and quarter.
-- **Paddock** sells the rest of the roster. Prices are game money.
+- **Slips** keeps each pass as a timeslip.
+- **Lot** sells the rest of the roster. Prices are game money.
+
+The side views are original drawings. Each chassis has its own nose, greenhouse, and deck. They are not BMW artwork.
 
 A red light loses. Power past the fuel system or the bottom end knocks, and an axle that is too small breaks on the hit.
 
