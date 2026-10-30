@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bimmer strip</title>
+    <link rel="icon" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-row">
+        <a class="wordmark" href="#garage" data-view="garage">Bimmer strip</a>
+        <nav class="nav" aria-label="Primary">
+          <a href="#garage" data-view="garage">Garage</a>
+          <a href="#tune" data-view="tune">Shop</a>
+          <a href="#strip" data-view="strip">Strip</a>
+          <a href="#slips" data-view="slips">Slips</a>
+          <a href="#paddock" data-view="paddock">Lot</a>
+        </nav>
+        <div class="tools">
+          <input class="search" id="search" type="search" placeholder="Search chassis or engine" />
+          <span class="cash" id="cash">$0</span>
+          <button class="btn btn-ghost" id="mute" type="button">Sound on</button>
+        </div>
+      </div>
+    </header>
+    <main class="page" id="app"></main>
+    <footer class="footer">
+      <div class="footer-row">
+        <span>Bimmer strip</span>
+        <div class="sources" id="sources"></div>
+        <button class="btn btn-ghost" id="reset" type="button">Reset paddock</button>
+      </div>
+    </footer>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
