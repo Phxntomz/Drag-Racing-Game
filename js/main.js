@@ -7,10 +7,14 @@ import {
   canEnter,
   carById,
   classForBuild,
+  brandName,
   defaultBuild,
   optionCost,
   paintById,
   partGroups,
+  partTier,
+  tierNote,
+  tierPrice,
   unmetRequires,
 } from "./data.js";
 import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js";
@@ -26,6 +30,7 @@ import {
   compile,
   createState,
   formatEt,
+  sampleCurve,
   simulate,
   step,
 } from "./sim.js";
@@ -46,7 +51,8 @@ if (!["garage", "tune", "strip", "slips", "paddock"].includes(view)) view = "gar
 let era = "all";
 let classId = "street";
 let treeMode = "full";
-let shopSection = "maps";
+let shopSection = "dyno";
+let dynoJob = 0;
 let pendingMap = null;
 let notice = "";
 let night = null;
@@ -114,6 +120,8 @@ function resolveSetup(car, item) {
     psi: item.setup?.psi ?? seed.idealPsi,
     boost: item.setup?.boost ?? 1,
     fdTrim: item.setup?.fdTrim ?? 1,
+    timing: item.setup?.timing ?? 1,
+    gears: item.setup?.gears || null,
   };
   return item.setup;
 }
@@ -151,6 +159,7 @@ function go(next) {
 }
 
 function paint() {
+  dynoJob += 1;
   document.querySelectorAll(".nav a").forEach((link) => {
     const on = link.dataset.view === view;
     link.setAttribute("aria-current", on ? "page" : "false");
@@ -261,18 +270,23 @@ function renderTune() {
   const item = owned();
   const { car, spec, slip } = preview(item);
   const groups = partGroups(car).filter((group) => group.id !== "software" && group.id !== "fuel");
-  if (shopSection !== "maps" && shopSection !== "setup" && !groups.some((group) => group.id === shopSection)) {
-    shopSection = "maps";
-  }
-  app.append(head(
-    "Shop",
-    shopSection === "maps" ? "Maps" : shopSection === "setup" ? "Setup" : groups.find((group) => group.id === shopSection).label,
-    shopSection === "maps"
-      ? "Pick the file that matches the hardware already on the car, then flash it. Fuel is part of the file. Downpipes and headers are not."
-      : shopSection === "setup"
-        ? "Launch, shift, and tire pressure. These stay in the car when you change maps."
-        : `Fits this ${car.chassis}. The price is for this car.`,
-  ));
+  const tabs = [["dyno", "Dyno"], ["tune", "Tune"], ["maps", "Maps"], ...groups.map((group) => [group.id, group.label])];
+  if (!tabs.some(([id]) => id === shopSection)) shopSection = "dyno";
+  const title = shopSection === "dyno"
+    ? "Dyno"
+    : shopSection === "tune"
+      ? "Tune"
+      : shopSection === "maps"
+        ? "Maps"
+        : groups.find((group) => group.id === shopSection).label;
+  const lede = shopSection === "dyno"
+    ? "Pull the car. The gray line is stock. Heat soak from the last pass is already in the sheet."
+    : shopSection === "tune"
+      ? "Launch, shift, timing, tire pressure, and the gears. The sheet moves while you slide."
+      : shopSection === "maps"
+        ? "Pick the file that matches the hardware already on the car, then flash it. Fuel is part of the file."
+        : `Three makers for each step. Budget is cheaper and lives less of the pass. Fits this ${car.chassis}.`;
+  app.append(head("Shop", title, lede));
   app.append(el("div", { class: "summary" }, [
     el("span", {}, [el("b", {}, `${Math.round(spec.hp)} hp`), " at the crank"]),
     el("span", {}, [el("b", {}, slip.quarter ? `${formatEt(slip.quarter)} @ ${slip.quarterMph.toFixed(1)}` : "—"), " perfect pass"]),
@@ -280,7 +294,7 @@ function renderTune() {
   ]));
 
   const rail = el("nav", { class: "rail", "aria-label": "Catalog" });
-  for (const [id, label] of [["maps", "Maps"], ...groups.map((group) => [group.id, group.label]), ["setup", "Setup"]]) {
+  for (const [id, label] of tabs) {
     const tab = el("button", { type: "button", class: shopSection === id ? "is-on" : "", "aria-pressed": shopSection === id ? "true" : "false" }, label);
     tab.addEventListener("click", () => {
       shopSection = id;
@@ -290,18 +304,26 @@ function renderTune() {
   }
 
   const main = el("div", {});
-  if (shopSection === "maps") main.append(renderMaps(item, car));
-  else if (shopSection === "setup") main.append(renderSetup(item, car, spec));
+  if (shopSection === "dyno") main.append(renderDyno(item));
+  else if (shopSection === "tune") main.append(renderSetup(item, car, spec));
+  else if (shopSection === "maps") main.append(renderMaps(item, car));
   else main.append(renderCatalog(item, car, groups.find((group) => group.id === shopSection)));
   app.append(el("div", { class: "shop" }, [rail, main]));
   fillTuneStats(item);
-  if (shopSection === "maps" || shopSection === "setup") requestAnimationFrame(() => redrawDyno(item));
+  if (shopSection === "dyno" || shopSection === "tune" || shopSection === "maps") {
+    requestAnimationFrame(() => {
+      redrawDyno(item, 1);
+      paintDynoReadout(item, 1);
+    });
+  }
 }
 
 function refreshTune(item) {
+  dynoJob += 1;
   persist();
   fillTuneStats(item);
-  redrawDyno(item);
+  redrawDyno(item, 1);
+  paintDynoReadout(item, 1);
 }
 
 function fillTuneStats(item) {
@@ -316,6 +338,7 @@ function fillTuneStats(item) {
     line("Final drive", spec.finalDrive.toFixed(2)),
     line("Bite", `${spec.suggestedLaunch} rpm`),
     line("Your launch", `${Math.round(setup.launchRpm)} rpm`),
+    line("Timing", `${((((setup.timing ?? 1) - 1) / 0.03) > 0 ? "+" : "")}${(((setup.timing ?? 1) - 1) / 0.03).toFixed(1)}°`),
     line("Vehicle quarter", slip.quarter ? `${formatEt(slip.quarter)} at ${slip.quarterMph.toFixed(1)} mph` : "Won't finish"),
     line("60 foot", formatEt(slip.ft60)),
     line("Class", className(classForBuild(item.build))),
@@ -327,12 +350,69 @@ function fillTuneStats(item) {
   if (label) label.textContent = `${setup.fdTrim.toFixed(2)}× · ${spec.finalDrive.toFixed(2)}`;
 }
 
-function redrawDyno(item) {
+function redrawDyno(item, sweep = 1) {
   const canvas = document.getElementById("dyno");
   if (!canvas) return;
   const car = carById(item.carId);
   const { spec } = preview(item);
-  drawDyno(canvas, spec, stockSpec(car));
+  drawDyno(canvas, spec, stockSpec(car), sweep);
+}
+
+function paintDynoReadout(item, sweep) {
+  const live = document.getElementById("dyno-live");
+  if (!live) return;
+  const { spec } = preview(item);
+  const raw = sampleCurve(spec, 56);
+  const hpPeak = Math.max(...raw.map((entry) => entry.hp), 1);
+  const tqPeak = Math.max(...raw.map((entry) => entry.tq), 1);
+  const hpScale = spec.hp / hpPeak;
+  const tqScale = spec.tq / tqPeak;
+  const limit = 800 + (spec.redline - 800) * Math.max(0, Math.min(1, sweep));
+  const row = raw.reduce((best, entry) => (Math.abs(entry.rpm - limit) < Math.abs(best.rpm - limit) ? entry : best), raw[0]);
+  const peakTq = raw.reduce((best, entry) => (entry.tq > best.tq ? entry : best), raw[0]);
+  const sweeping = sweep < 1;
+  live.replaceChildren(
+    el("span", {}, [el("b", {}, sweeping ? `${Math.round(row.rpm)} rpm` : `${Math.round(spec.peakHpRpm)} rpm`), sweeping ? " on the roller" : " peak power"]),
+    el("span", {}, [el("b", {}, `${Math.round(sweeping ? row.hp * hpScale : spec.hp)} hp`), sweeping ? " right now" : " peak"]),
+    el("span", {}, [el("b", {}, `${Math.round(sweeping ? row.tq * tqScale : spec.tq)} Nm`), sweeping ? " right now" : ` at ${Math.round(peakTq.rpm)} rpm`]),
+    el("span", {}, [el("b", {}, `${Math.round(spec.hp * spec.eff)} whp`), " through the gears"]),
+  );
+}
+
+function startDyno(item) {
+  dynoJob += 1;
+  const job = dynoJob;
+  const t0 = performance.now();
+  const run = (now) => {
+    if (job !== dynoJob) return;
+    const sweep = Math.min(1, (now - t0) / 2200);
+    redrawDyno(item, sweep);
+    paintDynoReadout(item, sweep);
+    if (sweep < 1) requestAnimationFrame(run);
+  };
+  requestAnimationFrame(run);
+}
+
+function coolCar(item) {
+  item.heat = 0;
+  persist();
+  paint();
+}
+
+function renderDyno(item) {
+  const panel = el("div", { class: "panel" }, [
+    el("p", { class: "kicker" }, "Rollers"),
+    el("canvas", { class: "dyno", id: "dyno" }),
+    el("div", { class: "dyno-live", id: "dyno-live" }),
+    el("div", { id: "tune-stats" }),
+    el("div", { id: "tune-warn" }),
+  ]);
+  const row = el("div", { class: "row", style: "margin-top:14px" });
+  row.append(button("Pull the dyno", () => startDyno(item), "btn"));
+  if (item.heat) row.append(button("Cool the car", () => coolCar(item), "btn btn-ghost"));
+  row.append(button("Race this tune", () => go("strip"), "btn btn-ghost"));
+  panel.append(row);
+  return panel;
 }
 
 function mapChoices() {
@@ -444,6 +524,7 @@ function renderSetup(item, car, spec) {
   const panel = el("div", { class: "panel" }, [
     el("p", { class: "kicker" }, "At the line"),
     el("canvas", { class: "dyno", id: "dyno" }),
+    el("div", { class: "dyno-live", id: "dyno-live" }),
     el("div", { id: "tune-stats" }),
     el("div", { id: "tune-warn" }),
   ]);
@@ -455,6 +536,10 @@ function renderSetup(item, car, spec) {
     item.setup.shiftRpm = value;
     refreshTune(item);
   }));
+  panel.append(slider("Timing", ((setup.timing ?? 1) - 1) / 0.03, -2, 2, 0.1, (value) => {
+    item.setup.timing = 1 + value * 0.03;
+    refreshTune(item);
+  }, "deg"));
   panel.append(slider("Tire pressure", setup.psi, 10, 40, 0.5, (value) => {
     item.setup.psi = value;
     refreshTune(item);
@@ -470,66 +555,134 @@ function renderSetup(item, car, spec) {
       item.setup.fdTrim = value;
       refreshTune(item);
     }, "x"));
+    const names = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+    car.gears.forEach((ratio, index) => {
+      const trim = setup.gears?.[index] || 1;
+      panel.append(slider(`${names[index] || index + 1} gear`, ratio * trim, ratio * 0.92, ratio * 1.08, 0.01, (value) => {
+        const gears = item.setup.gears ? [...item.setup.gears] : car.gears.map(() => 1);
+        gears[index] = value / ratio;
+        item.setup.gears = gears;
+        refreshTune(item);
+      }, "ratio"));
+    });
   }
-  panel.append(el("div", { class: "row", style: "margin-top:14px" }, [
-    button("Set the launch to the bite", () => {
-      item.setup.launchRpm = spec.suggestedLaunch;
-      item.setup.psi = spec.idealPsi;
-      persist();
-      paint();
-    }, "btn btn-ghost"),
-    button("Race this tune", () => go("strip"), "btn"),
-  ]));
+  const row = el("div", { class: "row", style: "margin-top:14px" });
+  row.append(button("Set the launch to the bite", () => {
+    item.setup.launchRpm = spec.suggestedLaunch;
+    item.setup.psi = spec.idealPsi;
+    item.setup.timing = 1;
+    persist();
+    paint();
+  }, "btn btn-ghost"));
+  if (item.heat) row.append(button("Cool the car", () => coolCar(item), "btn btn-ghost"));
+  row.append(button("Pull the dyno", () => startDyno(item), "btn"));
+  panel.append(row);
   return panel;
 }
 
 function renderCatalog(item, car, group) {
   const turbo = Boolean(car.turbo || car.spoolRpm);
   const current = item.build[group.id] || 0;
+  const fitted = partTier(item.build, group.id);
   const query = search.value.trim().toLowerCase();
+  const { spec } = preview(item);
   const grid = el("div", { class: "catalog" });
   for (const option of group.options) {
-    if (query && !`${option.name} ${option.note} ${group.label}`.toLowerCase().includes(query)) continue;
+    const brands = option.level === 0 ? "" : ["budget", "name", "works"].map((tier) => brandName(group.id, tier, turbo)).join(" ");
+    if (query && !`${option.name} ${option.note} ${group.label} ${brands}`.toLowerCase().includes(query)) continue;
     const card = el("article", { class: "panel product" }, [
       partFigure(artKind(group.id, option.level, turbo)),
       el("h2", {}, option.name),
       el("p", {}, option.note),
     ]);
-    const row = el("div", { class: "row" });
-    const price = option.level === 0 ? null : optionCost(car, group.id, option.level);
-    if (price) row.append(el("span", { class: "price" }, money(price)));
-    if (option.level === current) {
-      row.append(el("span", { class: "kicker" }, "On the car"));
-      if (option.level > 0) {
-        row.append(button("Remove", () => {
-          save.cash += Math.round(optionCost(car, group.id, option.level) * 0.4);
+    if (option.level === 0) {
+      const row = el("div", { class: "row" });
+      if (current === 0) row.append(el("span", { class: "kicker" }, "On the car"));
+      card.append(row);
+    } else if (option.level > current + 1) {
+      card.append(el("p", { class: "note" }, "Fit the step before this one."));
+    } else if (option.level < current) {
+      card.append(el("p", { class: "kicker" }, "Already past this step."));
+    } else {
+      const unmet = option.level === current ? [] : unmetRequires(car, item.build, group.id, option.level);
+      if (unmet.length) card.append(el("p", { class: "note" }, unmet[0].reason));
+      for (const tier of ["budget", "name", "works"]) {
+        const price = tierPrice(optionCost(car, group.id, option.level), tier);
+        const onCar = option.level === current && fitted === tier;
+        const projected = hpFor(item, car, group.id, option.level, tier);
+        const delta = Math.round(projected - spec.hp);
+        const row = el("div", { class: "tier-row" }, [
+          el("div", {}, [
+            el("div", { class: "tier-name" }, brandName(group.id, tier, turbo)),
+            el("div", { class: `tier ${tier}` }, tier === "budget" ? "Budget" : tier === "works" ? "Works" : "Name brand"),
+            el("p", {}, tierNote(tier)),
+            el("p", {}, onCar ? "On the car." : `${delta > 0 ? "+" : ""}${delta} hp on this sheet.`),
+          ]),
+        ]);
+        const actions = el("div", { class: "row" });
+        if (price) actions.append(el("span", { class: "price" }, money(onCar ? price : option.level === current ? Math.abs(swapCost(item, car, group.id, tier)) : price)));
+        if (onCar) {
+          actions.append(el("span", { class: "kicker" }, "Fitted"));
+        } else if (option.level === current) {
+          const pay = swapCost(item, car, group.id, tier);
+          const swap = button(pay > 0 ? "Swap" : "Swap down", () => {
+            if (pay > save.cash) return;
+            save.cash -= pay;
+            setTier(item, group.id, tier);
+            persist();
+            paint();
+          }, "btn btn-ghost");
+          if (pay > save.cash) swap.disabled = true;
+          actions.append(swap);
+        } else if (!unmet.length) {
+          const install = button("Add to car", () => {
+            if (save.cash < price) return;
+            save.cash -= price;
+            item.build[group.id] = option.level;
+            setTier(item, group.id, tier);
+            persist();
+            paint();
+          }, "btn");
+          if (save.cash < price) install.disabled = true;
+          actions.append(install);
+        }
+        row.append(actions);
+        card.append(row);
+      }
+      if (option.level === current && option.level > 0) {
+        card.append(button("Remove this step", () => {
+          const refund = Math.round(tierPrice(optionCost(car, group.id, option.level), fitted) * 0.4);
+          save.cash += refund;
           item.build[group.id] = option.level - 1;
+          if (item.build[group.id] <= 0 && item.build.quality) delete item.build.quality[group.id];
           persist();
           paint();
         }, "btn btn-ghost"));
       }
-    } else if (option.level === current + 1) {
-      const unmet = unmetRequires(car, item.build, group.id, option.level);
-      const cost = optionCost(car, group.id, option.level);
-      const install = button(cost ? "Add to car" : "Add to car", () => {
-        if (unmet.length || save.cash < cost) return;
-        save.cash -= cost;
-        item.build[group.id] = option.level;
-        persist();
-        paint();
-      }, "btn");
-      if (unmet.length || save.cash < cost) install.disabled = true;
-      row.append(install);
-      if (unmet.length) card.append(el("p", { class: "note" }, unmet[0].reason));
-      else if (save.cash < cost) card.append(el("p", { class: "note" }, "Short on cash."));
-    } else if (option.level > current + 1) {
-      card.append(el("p", { class: "note" }, "Fit the step before this one."));
     }
-    card.append(row);
     grid.append(card);
   }
   if (!grid.childElementCount) grid.append(el("p", { class: "empty" }, "Nothing in this category matches."));
   return grid;
+}
+
+function setTier(item, slot, tier) {
+  item.build.quality = { ...(item.build.quality || {}), [slot]: tier };
+}
+
+function swapCost(item, car, slot, tier) {
+  const level = item.build[slot] || 0;
+  const next = tierPrice(optionCost(car, slot, level), tier);
+  const prev = tierPrice(optionCost(car, slot, level), partTier(item.build, slot));
+  const delta = next - prev;
+  return delta > 0 ? delta : Math.round(delta * 0.4);
+}
+
+function hpFor(item, car, slot, level, tier) {
+  const build = { ...item.build, [slot]: level, quality: { ...(item.build.quality || {}) } };
+  if (level > 0) build.quality[slot] = tier;
+  else delete build.quality[slot];
+  return compile(car, build, item.setup, 0).hp;
 }
 
 function renderStrip() {
@@ -642,13 +795,7 @@ function fillRival(item, spec, slip, legal) {
     rollNight();
     paint();
   }, "btn btn-ghost"));
-  if (item.heat) {
-    row.append(button("Cool the car", () => {
-      item.heat = 0;
-      persist();
-      paint();
-    }, "btn btn-ghost"));
-  }
+  if (item.heat) row.append(button("Cool the car", () => coolCar(item), "btn btn-ghost"));
   card.append(row);
 }
 
@@ -1337,6 +1484,11 @@ function slider(label, value, min, max, step, onInput, suffix) {
 function formatSlider(value, suffix) {
   if (suffix === "psi") return `${Number(value).toFixed(1)} psi`;
   if (suffix === "x") return `${Number(value).toFixed(2)}×`;
+  if (suffix === "deg") {
+    const degrees = Number(value);
+    return `${degrees > 0 ? "+" : ""}${degrees.toFixed(1)}°`;
+  }
+  if (suffix === "ratio") return Number(value).toFixed(2);
   return `${Math.round(value)} rpm`;
 }
 

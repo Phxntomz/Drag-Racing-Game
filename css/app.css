@@ -395,9 +395,37 @@ a:hover { text-decoration: underline; }
 
 .dyno {
   width: 100%;
-  height: 250px;
+  height: 280px;
   display: block;
 }
+
+.dyno-live {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dyno-live b { color: var(--ink); font-weight: 680; }
+
+.tier-row {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.tier-name { font-weight: 680; }
+
+.tier { font-size: 12px; font-weight: 650; letter-spacing: 0.02em; }
+
+.tier.budget { color: var(--warn); }
+
+.tier.works { color: var(--blue); }
+
+.tier.name { color: var(--muted); }
 
 .slider { display: grid; gap: 4px; margin-top: 12px; }
 

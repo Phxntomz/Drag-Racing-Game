@@ -1216,6 +1216,93 @@ export function optionCost(car, slot, level) {
   return Math.round((option?.cost || 0) * factor);
 }
 
+/** Budget parts are cheaper and give up sooner. Works parts cost more and live longer. */
+export const TIERS = ["budget", "name", "works"];
+
+const TIER_COST = { budget: 0.62, name: 1, works: 1.42 };
+
+const BRANDS = {
+  budget: {
+    software: "Whitebox flash",
+    intake: "Shunli intake",
+    exhaustTurbo: "Hao downpipe",
+    exhaustNa: "Hao header",
+    cooling: "Shunli cooler",
+    fuel: "Jinshi fuel kit",
+    inductionTurbo: "Whitebox turbo",
+    inductionNa: "Whitebox cams",
+    bottom: "Shunli rods",
+    clutch: "Hao clutch",
+    driveline: "Jinshi axle",
+    gearbox: "Whitebox gearbox",
+    diff: "Shunli differential",
+    gearing: "Hao gears",
+    weight: "Pulled interior",
+    suspension: "Jinshi arms",
+    tires: "Hao tire",
+  },
+  name: {
+    software: "Nordwerk flash",
+    intake: "Nordwerk intake",
+    exhaustTurbo: "Rheinline downpipes",
+    exhaustNa: "Rheinline headers",
+    cooling: "Nordwerk cooler",
+    fuel: "Rheinline fuel",
+    inductionTurbo: "Nordwerk turbo",
+    inductionNa: "Nordwerk cams",
+    bottom: "Rheinline bottom end",
+    clutch: "Rheinline clutch",
+    driveline: "Nordwerk axles",
+    gearbox: "Rheinline gearbox",
+    diff: "Nordwerk differential",
+    gearing: "Rheinline gears",
+    weight: "Nordwerk diet",
+    suspension: "Rheinline launch kit",
+    tires: "Nordwerk tire",
+  },
+  works: {
+    software: "Schwarzwerk file",
+    intake: "Schwarzwerk intake",
+    exhaustTurbo: "ProLane downpipes",
+    exhaustNa: "ProLane headers",
+    cooling: "Schwarzwerk cooler",
+    fuel: "ProLane fuel",
+    inductionTurbo: "Schwarzwerk turbo",
+    inductionNa: "ProLane cams",
+    bottom: "Schwarzwerk bottom end",
+    clutch: "ProLane clutch",
+    driveline: "ProLane axles",
+    gearbox: "Schwarzwerk gearbox",
+    diff: "ProLane differential",
+    gearing: "Schwarzwerk gears",
+    weight: "ProLane diet",
+    suspension: "ProLane launch kit",
+    tires: "ProLane tire",
+  },
+};
+
+export function partTier(build, slot) {
+  const tier = build?.quality?.[slot];
+  return TIERS.includes(tier) ? tier : "name";
+}
+
+export function brandName(slot, tier, turbo) {
+  const table = BRANDS[tier] || BRANDS.name;
+  if (slot === "exhaust") return turbo ? table.exhaustTurbo : table.exhaustNa;
+  if (slot === "induction") return turbo ? table.inductionTurbo : table.inductionNa;
+  return table[slot] || "Part";
+}
+
+export function tierPrice(base, tier) {
+  return Math.round((base || 0) * (TIER_COST[tier] || 1));
+}
+
+export function tierNote(tier) {
+  if (tier === "budget") return "Cheaper metal. A little less power, and it knocks, slips, or heat-soaks sooner.";
+  if (tier === "works") return "Costs more. Holds the hit longer and gives less of the pull away to heat.";
+  return "The listed part. Power and life match the step.";
+}
+
 export function paintById(id) {
   return PAINTS.find((paint) => paint.id === id) || PAINTS[0];
 }

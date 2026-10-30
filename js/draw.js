@@ -690,7 +690,13 @@ function roundRect(ctx, x, y, w, h, r) {
 
 const FONT = "12px Helvetica, Arial, sans-serif";
 
-export function drawDyno(canvas, spec, stock) {
+function scaleCurve(rows, filedHp) {
+  const peak = Math.max(...rows.map((row) => row.hp), 1);
+  const scale = filedHp / peak;
+  return rows.map((row) => ({ ...row, hp: row.hp * scale, tq: row.tq * scale }));
+}
+
+export function drawDyno(canvas, spec, stock, sweep = 1) {
   const ctx = canvas.getContext("2d");
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = canvas.clientWidth || 640;
@@ -701,7 +707,11 @@ export function drawDyno(canvas, spec, stock) {
   ctx.clearRect(0, 0, w, h);
   const pad = { l: 46, r: 16, t: 22, b: 28 };
   const maxRpm = Math.max(spec.redline, stock.redline);
+  const tuned = scaleCurve(sampleCurve(spec, 56), spec.hp);
+  const base = scaleCurve(sampleCurve(stock, 56), stock.hp);
   const maxHp = Math.max(spec.hp, stock.hp, 200) * 1.08;
+  const shown = Math.max(0, Math.min(1, sweep));
+  const limit = 800 + (maxRpm - 800) * shown;
   const xOf = (rpm) => pad.l + ((rpm - 800) / (maxRpm - 800)) * (w - pad.l - pad.r);
   const yOf = (hp) => pad.t + (1 - hp / maxHp) * (h - pad.t - pad.b);
 
@@ -728,10 +738,11 @@ export function drawDyno(canvas, spec, stock) {
   ctx.lineTo(w - pad.r, h - pad.b);
   ctx.stroke();
 
-  const strokeCurve = (curveSpec, color, width) => {
-    const rows = sampleCurve(curveSpec, 48);
+  const strokeCurve = (rows, color, width, clip) => {
+    const drawn = clip ? rows.filter((row) => row.rpm <= limit + 30) : rows;
+    if (!drawn.length) return;
     ctx.beginPath();
-    rows.forEach((row, i) => {
+    drawn.forEach((row, i) => {
       const x = xOf(row.rpm);
       const y = yOf(row.hp);
       if (i === 0) ctx.moveTo(x, y);
@@ -742,8 +753,15 @@ export function drawDyno(canvas, spec, stock) {
     ctx.stroke();
   };
 
-  strokeCurve(stock, "#9aa3ad", 1.5);
-  strokeCurve(spec, "#0c5ebd", 2.4);
+  strokeCurve(base, "#9aa3ad", 1.5, false);
+  strokeCurve(tuned, "#0c5ebd", 2.4, true);
+  if (shown < 1) {
+    const row = tuned.reduce((best, item) => (Math.abs(item.rpm - limit) < Math.abs(best.rpm - limit) ? item : best), tuned[0]);
+    ctx.fillStyle = "#0c5ebd";
+    ctx.beginPath();
+    ctx.arc(xOf(row.rpm), yOf(row.hp), 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.fillStyle = "#5c6570";
   ctx.fillText("Stock", w - 118, 14);
   ctx.fillStyle = "#0c5ebd";

@@ -162,8 +162,23 @@ expect(starvedSpec.warnings.length > 0, "fuel cap should warn");
 
 const stage1 = defaultBuild();
 stage1.software = 1;
-const stage1Spec = compile(starved, stage1, { launchRpm: 4000, shiftRpm: 6800, psi: 32, boost: 1, fdTrim: 1 });
+const stage1Setup = { launchRpm: 4000, shiftRpm: 6800, psi: 32, boost: 1, fdTrim: 1 };
+const stage1Spec = compile(starved, stage1, stage1Setup);
 expect(stage1Spec.hp > starved.hp + 40, "stage 1 should add power");
+
+const budgetBuild = { ...stage1, intake: 1, clutch: 1, quality: { software: "budget", intake: "budget", clutch: "budget" } };
+const budgetSpec = compile(starved, budgetBuild, stage1Setup);
+const nameBuild = { ...stage1, intake: 1, clutch: 1, quality: { software: "name", intake: "name", clutch: "name" } };
+const nameSpec = compile(starved, nameBuild, stage1Setup);
+expect(budgetSpec.hp < nameSpec.hp, "budget parts should make less power than the name-brand set");
+expect(budgetSpec.knockRate >= nameSpec.knockRate, "budget parts should not be kinder than name-brand parts");
+expect(budgetSpec.clutchNm < nameSpec.clutchNm, "a budget clutch should hold less");
+
+const advanced = compile(starved, stage1, { ...stage1Setup, timing: 1.06 });
+const neutral = compile(starved, stage1, { ...stage1Setup, timing: 1 });
+expect(advanced.hp > stage1Spec.hp, "advanced timing should add power");
+expect(advanced.knockRate > stage1Spec.knockRate, "advanced timing should add knock");
+expect(Math.abs(neutral.hp - stage1Spec.hp) < 0.01, "timing at 1 should match an unset timing");
 
 if (failures.length) {
   console.error(failures.join("\n"));

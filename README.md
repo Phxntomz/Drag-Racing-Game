@@ -21,7 +21,7 @@ python3 -m http.server 8765
 The server prints a local address. Open that address in the same machine’s browser.
 
 - **Garage** is the car in the bay: paint, name, and the window sticker.
-- **Shop** is the catalog. Maps are flashed like an OTS file (stage, then 93 / E30 / E85). Hardware is a parts grid. Setup holds launch rpm, shift rpm, tire pressure, boost, and final drive.
+- **Shop** opens on the dyno. Pull the rollers, then cool the car if the last pass is still in the sheet. Tune holds launch, shift, timing, tire pressure, boost, and, once the gears are swapped, each ratio. Maps are flashed like an OTS file. Hardware is sold three ways: a cheap part, a name-brand part, and a works part. The cheap ones make a little less power and fail sooner.
 - **Strip** is a full 0.500 tree or a 0.400 pro tree. Space launches. Shift or the up arrow grabs the next gear on a manual. DCT, ZF, and SMG cars shift themselves at the rpm you set.
 - **Slips** keeps each pass as a timeslip.
 - **Lot** sells the rest of the roster. Prices are game money.

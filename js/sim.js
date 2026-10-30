@@ -8,7 +8,7 @@
  * limit are the tuning outputs.
  */
 
-import { FAMILIES } from "./data.js";
+import { FAMILIES, partTier } from "./data.js";
 
 export const FT60 = 18.288;
 export const FT330 = 100.584;
@@ -88,7 +88,24 @@ export function compile(car, build, setup, heat = 0) {
   if (!build.cooling && (build.induction > 0 || mult > 1.38)) knockRate += 0.05;
   if (build.cooling) knockRate *= 0.7;
 
-  const soaked = heat > 0 ? (build.cooling ? 0.02 : 0.075) * Math.min(1, heat) : 0;
+  const hardware = hardwareFactor(build);
+  mult *= hardware.power;
+  knockRate *= 1 + hardware.fragile * 0.12;
+  knockRate *= Math.max(0.7, 1 - hardware.stout * 0.04);
+
+  const timing = timingTrim(setup);
+  mult *= 1 + (timing - 1) * 0.45;
+  if (timing > 1) knockRate += (timing - 1) * 1.4;
+  if (timing < 1) knockRate *= 0.55 + 0.45 * ((timing - 0.94) / 0.06);
+
+  const coolRate = !build.cooling
+    ? 0.075
+    : partTier(build, "cooling") === "budget"
+      ? 0.05
+      : partTier(build, "cooling") === "works"
+        ? 0.012
+        : 0.02;
+  const soaked = heat > 0 ? coolRate * Math.min(1, heat) : 0;
   mult *= 1 - soaked;
 
   const tire = TIRE[build.tires] || TIRE[0];
@@ -104,13 +121,15 @@ export function compile(car, build, setup, heat = 0) {
   const massDrop = build.weight === 0 ? 0 : build.weight === 1 ? 40 : 105;
   const cg = Math.max(0.42, car.cg - (build.weight === 2 ? 0.02 : build.weight === 1 ? 0.01 : 0));
 
-  const clutchMul = build.clutch === 0 ? 1.15 : build.clutch === 1 ? 1.85 : 3.3;
+  const life = Math.max(0.62, 1 - hardware.fragile * 0.08) * (1 + hardware.stout * 0.03);
+  const clutchMul = (build.clutch === 0 ? 1.15 : build.clutch === 1 ? 1.85 : 3.3) * (build.clutch ? life : 1);
   const dumpMul = build.clutch === 2 ? 0.72 : build.clutch === 1 ? 0.85 : 1;
-  const axleMul = build.driveline === 0 ? 1.45 : build.driveline === 1 ? 2.15 : 3.4;
+  const axleMul = (build.driveline === 0 ? 1.45 : build.driveline === 1 ? 2.15 : 3.4) * (build.driveline ? life : 1);
   const shiftMul = build.gearbox ? 0.72 : 1;
   const fd = car.finalDrive * (build.gearing ? setup?.fdTrim || 1 : 1);
+  const gears = trimmedGears(car, build, setup);
 
-  const first = car.gears[0] * fd;
+  const first = gears[0] * fd;
   const peakTq = car.tq * mult;
 
   const warnings = [];
@@ -121,6 +140,8 @@ export function compile(car, build, setup, heat = 0) {
   if (requested > fuelCap + 0.04) warnings.push("The fuel system is the ceiling. More turbo does not show up until the pumps do.");
   if (mult > safe + 0.02) warnings.push("This power is past what the bottom end is rated for. A full pass can knock it out.");
   if (boost > 1.03 && mult >= fuelCap - 0.01) warnings.push("Boost past the fuel cap only adds knock.");
+  if (hardware.fragile > 0) warnings.push("Budget parts are on the car. They make a little less power and give up sooner.");
+  if (timing > 1.03) warnings.push("Timing is advanced. The sheet looks stronger, and a long hit knocks.");
 
   const spec = {
     carId: car.id,
@@ -148,7 +169,7 @@ export function compile(car, build, setup, heat = 0) {
     height: car.height,
     cd: car.cd,
     area: car.area,
-    gears: car.gears,
+    gears,
     finalDrive: fd,
     eff: trans.eff - (car.drive === "awd" ? 0.03 : 0),
     shiftTime: trans.shift * shiftMul,
@@ -172,6 +193,45 @@ export function compile(car, build, setup, heat = 0) {
   };
   spec.suggestedLaunch = biteRpm(spec);
   return spec;
+}
+
+function hardwareFactor(build) {
+  const quality = build?.quality || {};
+  let bonus = 0;
+  let penalty = 0;
+  let fragile = 0;
+  let stout = 0;
+  for (const slot of Object.keys(quality)) {
+    if (!(build[slot] > 0)) continue;
+    const tier = partTier(build, slot);
+    if (tier === "budget") {
+      penalty += 0.012;
+      fragile += 1;
+    } else if (tier === "works") {
+      bonus += 0.006;
+      stout += 1;
+    }
+  }
+  return {
+    power: (1 + Math.min(0.04, bonus)) * (1 - Math.min(0.1, penalty)),
+    fragile,
+    stout,
+  };
+}
+
+function timingTrim(setup) {
+  const raw = Number(setup?.timing);
+  if (!Number.isFinite(raw)) return 1;
+  return Math.min(1.06, Math.max(0.94, raw));
+}
+
+function trimmedGears(car, build, setup) {
+  if (!build?.gearing) return car.gears;
+  return car.gears.map((ratio, index) => {
+    const trim = Number(setup?.gears?.[index]);
+    const clamped = Number.isFinite(trim) ? Math.min(1.08, Math.max(0.92, trim)) : 1;
+    return ratio * clamped;
+  });
 }
 
 function carBoost(car, build, setup) {
