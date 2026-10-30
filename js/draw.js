@@ -1,9 +1,71 @@
-/** Side views. E30, E36, and E46 are traced from the reference photos.
- *  The other chassis stay on the measured outline until a photo is traced.
+/** Side views. E30, E36, and E46 use the reference photos.
+ *  The other chassis stay on the measured outline.
+ *  Sprites are stored nose-left. The strip asks for face "right".
  */
 
 import { sampleCurve } from "./sim.js";
 import { TRACES } from "./traces.js";
+
+const PHOTO_PACKS = {
+  e30: {
+    stock: { file: "e30-stock.png", aspect: 1180 / 382 },
+    mod: { file: "e30-mod.png", aspect: 1097 / 342 },
+  },
+  e36: {
+    stock: { file: "e36-stock.png", aspect: 1400 / 431 },
+    mod: { file: "e36-mod.png", aspect: 462 / 137 },
+  },
+  e46: {
+    stock: { file: "e46-stock.png", aspect: 800 / 259 },
+    mod: { file: "e46-mod.png", aspect: 795 / 249 },
+  },
+};
+
+const spriteListeners = new Set();
+let spritesLeft = 0;
+
+function settleSprite() {
+  spritesLeft -= 1;
+  if (spritesLeft > 0) return;
+  for (const fn of spriteListeners) fn();
+}
+
+function loadSprite(entry) {
+  const img = new Image();
+  let settled = false;
+  spritesLeft += 1;
+  const done = () => {
+    if (settled) return;
+    settled = true;
+    settleSprite();
+  };
+  img.onload = done;
+  img.onerror = done;
+  img.decoding = "async";
+  img.src = new URL(`../assets/cars/${entry.file}`, import.meta.url).href;
+  entry.img = img;
+  if (img.complete) done();
+}
+
+for (const pack of Object.values(PHOTO_PACKS)) {
+  loadSprite(pack.stock);
+  loadSprite(pack.mod);
+}
+
+export function onCarSprites(fn) {
+  spriteListeners.add(fn);
+  if (spritesLeft === 0) fn();
+}
+
+function aeroLook(opts) {
+  return (opts.suspension >= 1) || (opts.tires >= 2) || (opts.weight >= 1);
+}
+
+function photoFor(car, opts) {
+  const pack = PHOTO_PACKS[car.shape];
+  if (!pack) return null;
+  return aeroLook(opts) ? pack.mod : pack.stock;
+}
 
 const SHAPES = {
   e30: {
@@ -300,6 +362,8 @@ function addBody(ctx, spec, L, H, ground, frontAxle, rearAxle, arch, archW) {
 }
 
 export function spriteHeight(car, opts = {}) {
+  const photo = photoFor(car, opts);
+  if (photo) return car.length / photo.aspect;
   const trace = traceFor(car, opts);
   if (!trace) return car.height;
   return car.length / trace.aspect;
@@ -322,11 +386,47 @@ function traceFor(car, opts) {
 }
 
 export function drawCar(ctx, car, paint, x, ground, px, opts = {}) {
-  const traced = traceFor(car, opts);
-  if (traced) {
-    drawTraced(ctx, car, traced, paint, x, ground, px, opts);
+  const lengthPx = car.length * px;
+  ctx.save();
+  let localX = x;
+  let localOpts = opts;
+  if (opts.face === "right") {
+    ctx.translate(x + lengthPx, 0);
+    ctx.scale(-1, 1);
+    localX = 0;
+    localOpts = { ...opts, spin: -(opts.spin || 0) };
+  }
+  const photo = photoFor(car, localOpts);
+  if (photo?.img?.complete && photo.img.naturalWidth) {
+    drawPhoto(ctx, car, photo, localX, ground, px);
+    ctx.restore();
     return;
   }
+  const traced = traceFor(car, localOpts);
+  if (traced) {
+    drawTraced(ctx, car, traced, paint, localX, ground, px, localOpts);
+    ctx.restore();
+    return;
+  }
+  drawOutline(ctx, car, paint, localX, ground, px, localOpts);
+  ctx.restore();
+}
+
+function drawPhoto(ctx, car, photo, x, ground, px) {
+  const L = car.length * px;
+  const H = L / photo.aspect;
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.fillStyle = "rgba(0,0,0,.2)";
+  ctx.beginPath();
+  ctx.ellipse(x + L * 0.5, ground + 1, L * 0.36, Math.max(3, px * 0.05), 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.drawImage(photo.img, x, ground - H, L, H);
+  ctx.restore();
+}
+
+function drawOutline(ctx, car, paint, x, ground, px, opts = {}) {
   const shape = SHAPES[car.shape] ? car.shape : "e46";
   const spec = SHAPES[shape];
   const L = car.length * px;
@@ -716,16 +816,19 @@ export function drawStrip(ctx, w, h, scene) {
   if (rival) ctx.fillText(scene.rivalName || "Other lane", w - 16, lanes[0] - laneH * 0.58);
   ctx.textAlign = "left";
 
+  // state.x is the nose. The sprite's nose is its right edge, so the tail sits one car length behind the beam.
   if (rival) {
-    drawCar(ctx, rival.car, rival.paint, sx(rival.state.x), lanes[0] + laneH * 0.42, px, {
+    drawCar(ctx, rival.car, rival.paint, sx(rival.state.x) - rival.car.length * px, lanes[0] + laneH * 0.42, px, {
       tireRadius: rival.spec.tireRadius,
       spin: rival.state.x / rival.spec.tireRadius,
+      face: "right",
       ...lookOpts(rival.build),
     });
   }
-  drawCar(ctx, player.car, player.paint, sx(player.state.x), lanes[1] + laneH * 0.42, px, {
+  drawCar(ctx, player.car, player.paint, sx(player.state.x) - player.car.length * px, lanes[1] + laneH * 0.42, px, {
     tireRadius: player.spec.tireRadius,
     spin: (player.state.x || 0) / player.spec.tireRadius,
+    face: "right",
     ...lookOpts(player.build),
   });
 }
@@ -746,7 +849,7 @@ export function cameraFor(w, player, rival) {
   const span = Math.max(18, lead - trail + player.car.length + 6);
   const px = Math.max(18, Math.min(52, (w * 0.78) / span));
   let cam = lead - (w * 0.62) / px;
-  const minCam = -(w * 0.18) / px;
+  const minCam = -player.car.length - (w * 0.08) / px;
   if (cam < minCam) cam = minCam;
   return { px, cam };
 }

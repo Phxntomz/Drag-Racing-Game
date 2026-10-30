@@ -15,7 +15,7 @@ import {
 } from "./data.js";
 import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js";
 import { artKind, partFigure } from "./art.js";
-import { cameraFor, drawCar, drawDyno, drawStrip, spriteHeight } from "./draw.js";
+import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js";
 import {
   EIGHTH,
   FT1000,
@@ -1464,3 +1464,15 @@ function bind() {
 
 bind();
 paint();
+onCarSprites(() => {
+  if (view === "garage") {
+    const item = owned();
+    const { car, spec } = preview(item);
+    drawHero(item, car, spec);
+    drawMounted();
+  } else if (view === "paddock") {
+    drawMounted();
+  } else if (view === "strip" && !race) {
+    drawIdle();
+  }
+});
