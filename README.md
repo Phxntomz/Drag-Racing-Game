@@ -6,13 +6,9 @@ E30, E36, and E46 side views are the reference photos, cut out and overlaid. The
 
 ## Play
 
-GitHub hosts the game at <https://phxntomz.github.io/Drag-Racing-Game/> once Pages is allowed to deploy this repo. That switch is off right now, which is why the link 404s. Turn it on once:
+GitHub hosts the game at <https://phxntomz.github.io/Drag-Racing-Game/>. Cash, cars, parts, setup, and timeslips are stored in that browser. Open the same link again and the paddock is still there. A different browser or phone keeps its own paddock. Reset paddock clears this one.
 
-1. Open [Pages settings](https://github.com/Phxntomz/Drag-Racing-Game/settings/pages).
-2. Set **Build and deployment** → **Source** to **GitHub Actions**.
-3. Re-run the **Publish the game** workflow. The next push publishes on its own.
-
-To play from a checkout before that, run a static server in the repo folder:
+To play from a checkout, run a static server in the repo folder:
 
 ```bash
 python3 -m http.server 8765
