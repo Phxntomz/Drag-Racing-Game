@@ -6,11 +6,19 @@ E30, E36, and E46 side views are original traces of the body, glass, and wheels.
 
 ## Play
 
+GitHub hosts the game at <https://phxntomz.github.io/Drag-Racing-Game/> once Pages is allowed to deploy this repo. That switch is off right now, which is why the link 404s. Turn it on once:
+
+1. Open [Pages settings](https://github.com/Phxntomz/Drag-Racing-Game/settings/pages).
+2. Set **Build and deployment** → **Source** to **GitHub Actions**.
+3. Re-run the **Publish the game** workflow. The next push publishes on its own.
+
+To play from a checkout before that, run a static server in the repo folder:
+
 ```bash
 python3 -m http.server 8765
 ```
 
-Open `http://127.0.0.1:8765`.
+The server prints a local address. Open that address in the same machine’s browser.
 
 - **Garage** is the car in the bay: paint, name, and the window sticker.
 - **Shop** is the catalog. Maps are flashed like an OTS file (stage, then 93 / E30 / E85). Hardware is a parts grid. Setup holds launch rpm, shift rpm, tire pressure, boost, and final drive.
