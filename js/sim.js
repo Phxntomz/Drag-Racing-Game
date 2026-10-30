@@ -8,7 +8,7 @@
  * limit are the tuning outputs.
  */
 
-import { FAMILIES, partTier } from "./data.js";
+import { FAMILIES, partTier } from "./data.js?v=3";
 
 export const FT60 = 18.288;
 export const FT330 = 100.584;

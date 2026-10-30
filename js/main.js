@@ -16,10 +16,10 @@ import {
   tierNote,
   tierPrice,
   unmetRequires,
-} from "./data.js";
-import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js";
-import { artKind, partFigure } from "./art.js";
-import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js";
+} from "./data.js?v=3";
+import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=3";
+import { artKind, partFigure } from "./art.js?v=3";
+import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=3";
 import {
   EIGHTH,
   FT1000,
@@ -33,8 +33,8 @@ import {
   sampleCurve,
   simulate,
   step,
-} from "./sim.js";
-import { clearSave, readSave, writeSave } from "./save.js";
+} from "./sim.js?v=3";
+import { clearSave, readSave, writeSave } from "./save.js?v=3";
 
 let storageBlocked = false;
 let keepState = "fresh";
@@ -48,12 +48,13 @@ const MARKS = [
 
 const app = document.querySelector("#app");
 let save = load();
-let view = location.hash.replace("#", "") || "garage";
+const hash = location.hash.replace("#", "") || "garage";
+let shopSection = hash === "tune" ? "intake" : "dyno";
+let view = hash === "dyno" ? "tune" : hash;
 if (!["garage", "tune", "strip", "slips", "paddock"].includes(view)) view = "garage";
 let era = "all";
 let classId = "street";
 let treeMode = "full";
-let shopSection = "dyno";
 let dynoJob = 0;
 let pendingMap = null;
 let notice = "";
@@ -169,15 +170,27 @@ function go(next) {
     notice = "You left the lanes. The buy-in stays with the tower.";
     cancelRace();
   }
+  if (next === "dyno") {
+    shopSection = "dyno";
+    next = "tune";
+  } else if (next === "tune" && shopSection === "dyno") {
+    shopSection = "intake";
+  }
   view = next;
-  history.replaceState(null, "", `#${next}`);
   paint();
 }
 
 function paint() {
   dynoJob += 1;
+  const hashName = view === "tune" && shopSection === "dyno" ? "dyno" : view;
+  if (location.hash !== `#${hashName}`) history.replaceState(null, "", `#${hashName}`);
   document.querySelectorAll(".nav a").forEach((link) => {
-    const on = link.dataset.view === view;
+    const key = link.dataset.view;
+    const on = key === "dyno"
+      ? view === "tune" && shopSection === "dyno"
+      : key === "tune"
+        ? view === "tune" && shopSection !== "dyno"
+        : key === view;
     link.setAttribute("aria-current", on ? "page" : "false");
   });
   cashEl.textContent = money(save.cash);
@@ -275,10 +288,13 @@ function renderGarage() {
     list.append(card);
   }
 
-  app.append(el("div", { class: "layout" }, [bay, facts]), list);
+  const sheet = el("section", { class: "garage-dyno" }, [renderDyno(item)]);
+  app.append(el("div", { class: "layout" }, [bay, facts]), sheet, list);
   requestAnimationFrame(() => {
     drawHero(item, car, spec);
     drawMounted();
+    redrawDyno(item, 1);
+    paintDynoReadout(item, 1);
   });
 }
 
@@ -390,7 +406,7 @@ function paintDynoReadout(item, sweep) {
   live.replaceChildren(
     el("span", {}, [el("b", {}, sweeping ? `${Math.round(row.rpm)} rpm` : `${Math.round(spec.peakHpRpm)} rpm`), sweeping ? " on the roller" : " peak power"]),
     el("span", {}, [el("b", {}, `${Math.round(sweeping ? row.hp * hpScale : spec.hp)} hp`), sweeping ? " right now" : " peak"]),
-    el("span", {}, [el("b", {}, `${Math.round(sweeping ? row.tq * tqScale : spec.tq)} Nm`), sweeping ? " right now" : ` at ${Math.round(peakTq.rpm)} rpm`]),
+    el("span", {}, [el("b", {}, sweeping ? `${Math.round(row.tq * tqScale)} Nm` : `${Math.round(spec.tq)} Nm at ${Math.round(peakTq.rpm)} rpm`), sweeping ? " right now" : " peak torque"]),
     el("span", {}, [el("b", {}, `${Math.round(spec.hp * spec.eff)} whp`), " through the gears"]),
   );
 }
@@ -417,7 +433,7 @@ function coolCar(item) {
 
 function renderDyno(item) {
   const panel = el("div", { class: "panel" }, [
-    el("p", { class: "kicker" }, "Rollers"),
+    el("p", { class: "kicker" }, "Dyno"),
     el("canvas", { class: "dyno", id: "dyno" }),
     el("div", { class: "dyno-live", id: "dyno-live" }),
     el("div", { id: "tune-stats" }),
@@ -1622,6 +1638,7 @@ function bind() {
       const { car, spec } = preview(item);
       drawHero(item, car, spec);
       drawMounted();
+      redrawDyno(item);
     }
     if (view === "paddock") drawMounted();
   });

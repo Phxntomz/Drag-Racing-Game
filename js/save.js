@@ -3,7 +3,7 @@
  * The file lives in this browser's localStorage, so the same link reloads
  * cash, cars, parts, setup, and slips. A second copy is kept beside it.
  */
-import { defaultBuild } from "./data.js";
+import { defaultBuild } from "./data.js?v=3";
 
 export const SAVE_KEY = "bimmer-strip-v1";
 export const BACKUP_KEY = "bimmer-strip-v1-backup";

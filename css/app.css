@@ -393,10 +393,14 @@ a:hover { text-decoration: underline; }
   margin-top: 12px;
 }
 
+.garage-dyno { margin-top: 18px; }
+
 .dyno {
   width: 100%;
   height: 280px;
   display: block;
+  background: #f7f8fa;
+  border-radius: 8px;
 }
 
 .dyno-live {
