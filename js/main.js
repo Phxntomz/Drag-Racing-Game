@@ -29,8 +29,10 @@ import {
   simulate,
   step,
 } from "./sim.js";
+import { clearSave, readSave, writeSave } from "./save.js";
 
-const KEY = "bimmer-strip-v1";
+let storageBlocked = false;
+let keepState = "fresh";
 const MARKS = [
   ["ft60", FT60],
   ["ft330", FT330],
@@ -58,34 +60,48 @@ const search = document.querySelector("#search");
 const cashEl = document.querySelector("#cash");
 
 function load() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(KEY) || "");
-    if (parsed?.cars?.length) return parsed;
-  } catch {
-    /* fresh paddock */
-  }
-  const uid = makeId();
-  return {
-    cash: 8000,
-    cars: [
-      {
-        uid,
-        carId: "e90335",
-        paint: "black",
-        name: "Shop 335i",
-        build: defaultBuild(),
-        setup: null,
-        damage: null,
-      },
-    ],
-    active: uid,
-    slips: [],
-  };
+  const result = readSave(localStorage, makeId);
+  storageBlocked = result.blocked;
+  keepState = result.blocked ? "blocked" : result.restored ? "saved" : "fresh";
+  return result.save;
 }
 
-function persist() {
-  localStorage.setItem(KEY, JSON.stringify(save));
-  cashEl.textContent = money(save.cash);
+function commitName() {
+  const rename = document.querySelector("#rename");
+  const item = owned();
+  if (!rename || !item) return;
+  const car = carById(item.carId);
+  item.name = rename.value.trim() || car?.name || item.name;
+}
+
+function markSaved() {
+  const node = document.querySelector("#keep");
+  if (!node) return;
+  if (keepState === "blocked") {
+    node.textContent = "This browser is not keeping the paddock.";
+    return;
+  }
+  if (keepState === "fresh") {
+    node.textContent = "This browser keeps the paddock";
+    return;
+  }
+  const count = save.cars.length;
+  node.textContent = `Saved in this browser · ${count === 1 ? "1 car" : `${count} cars`}`;
+}
+
+function persist(options = {}) {
+  if (options.commit) commitName();
+  if (!storageBlocked) {
+    try {
+      writeSave(localStorage, save);
+      keepState = "saved";
+    } catch {
+      storageBlocked = true;
+      keepState = "blocked";
+    }
+  }
+  if (cashEl) cashEl.textContent = money(save.cash);
+  markSaved();
 }
 
 function makeId() {
@@ -1422,13 +1438,19 @@ function bind() {
     localStorage.setItem("bimmer-strip-mute", isMuted() ? "1" : "0");
   });
   document.querySelector("#reset").addEventListener("click", () => {
-    localStorage.removeItem(KEY);
+    clearSave(localStorage);
     save = load();
     night = null;
     pendingMap = null;
     cancelRace();
     notice = "";
+    markSaved();
     go("garage");
+  });
+  const flush = () => persist({ commit: true });
+  window.addEventListener("pagehide", flush);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flush();
   });
   window.addEventListener("keydown", (event) => {
     if (event.target.matches("input, textarea")) return;
@@ -1460,6 +1482,7 @@ function bind() {
     setMuted(true);
     document.querySelector("#mute").textContent = "Sound off";
   }
+  markSaved();
 }
 
 bind();
