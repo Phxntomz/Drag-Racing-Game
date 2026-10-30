@@ -15,7 +15,7 @@ import {
 } from "./data.js";
 import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js";
 import { artKind, partFigure } from "./art.js";
-import { cameraFor, drawCar, drawDyno, drawStrip } from "./draw.js";
+import { cameraFor, drawCar, drawDyno, drawStrip, spriteHeight } from "./draw.js";
 import {
   EIGHTH,
   FT1000,
@@ -233,6 +233,9 @@ function renderGarage() {
         "data-paint": paintById(ownedCar.paint).hex,
         "data-induction": String(ownedCar.build.induction || 0),
         "data-exhaust": String(ownedCar.build.exhaust || 0),
+        "data-suspension": String(ownedCar.build.suspension || 0),
+        "data-tires": String(ownedCar.build.tires || 0),
+        "data-weight": String(ownedCar.build.weight || 0),
       }),
       el("p", { class: "kicker" }, info.chassis),
       el("h2", {}, ownedCar.name),
@@ -1370,11 +1373,15 @@ function drawHero(item, car, spec) {
   const w = node.clientWidth || 640;
   const h = node.clientHeight || 240;
   ctx.clearRect(0, 0, w, h);
-  const px = Math.min((h * 0.62) / car.height, (w - 36) / car.length);
-  drawCar(ctx, car, paintById(item.paint).hex, (w - car.length * px) / 2, h * 0.82, px, {
+  const tall = spriteHeight(car, item.build);
+  const px = Math.min((h * 0.7) / tall, (w - 36) / car.length);
+  drawCar(ctx, car, paintById(item.paint).hex, (w - car.length * px) / 2, h * 0.84, px, {
     tireRadius: spec.tireRadius,
     induction: item.build.induction,
     exhaust: item.build.exhaust,
+    suspension: item.build.suspension,
+    tires: item.build.tires,
+    weight: item.build.weight,
   });
 }
 
@@ -1387,11 +1394,15 @@ function drawMounted() {
     const w = node.clientWidth || 280;
     const h = node.clientHeight || 128;
     ctx.clearRect(0, 0, w, h);
-    const px = Math.min((h * 0.7) / car.height, (w - 16) / car.length);
-    drawCar(ctx, car, node.dataset.paint || "#14161c", (w - car.length * px) / 2, h * 0.84, px, {
+    const look = {
       induction: Number(node.dataset.induction || 0),
       exhaust: Number(node.dataset.exhaust || 0),
-    });
+      suspension: Number(node.dataset.suspension || 0),
+      tires: Number(node.dataset.tires || 0),
+      weight: Number(node.dataset.weight || 0),
+    };
+    const px = Math.min((h * 0.72) / spriteHeight(car, look), (w - 16) / car.length);
+    drawCar(ctx, car, node.dataset.paint || "#14161c", (w - car.length * px) / 2, h * 0.86, px, look);
   });
 }
 

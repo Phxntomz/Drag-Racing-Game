@@ -1,8 +1,9 @@
-/** Side views drawn from published length, height, and wheelbase.
- *  Greenhouse, nose, and deck follow each chassis, not one shared blob.
+/** Side views. E30, E36, and E46 are traced from the reference photos.
+ *  The other chassis stay on the measured outline until a photo is traced.
  */
 
 import { sampleCurve } from "./sim.js";
+import { TRACES } from "./traces.js";
 
 const SHAPES = {
   e30: {
@@ -298,7 +299,34 @@ function addBody(ctx, spec, L, H, ground, frontAxle, rearAxle, arch, archW) {
   ctx.closePath();
 }
 
+export function spriteHeight(car, opts = {}) {
+  const trace = traceFor(car, opts);
+  if (!trace) return car.height;
+  return car.length / trace.aspect;
+}
+
+function traceFor(car, opts) {
+  const pack = TRACES[car.shape];
+  if (!pack) return null;
+  const aero = (opts.suspension >= 1) || (opts.tires >= 2) || (opts.weight >= 1);
+  const src = aero && pack.mod ? pack.mod : pack;
+  const dressed = aero || (opts.tires >= 1);
+  return {
+    aspect: src.aspect,
+    body: src.body,
+    windows: src.windows,
+    wheels: src.wheels,
+    wheel: dressed && pack.mod ? pack.mod.wheel : pack.wheel,
+    rim: dressed && pack.mod ? pack.mod.rim : pack.rim,
+  };
+}
+
 export function drawCar(ctx, car, paint, x, ground, px, opts = {}) {
+  const traced = traceFor(car, opts);
+  if (traced) {
+    drawTraced(ctx, car, traced, paint, x, ground, px, opts);
+    return;
+  }
   const shape = SHAPES[car.shape] ? car.shape : "e46";
   const spec = SHAPES[shape];
   const L = car.length * px;
@@ -433,40 +461,115 @@ export function drawCar(ctx, car, paint, x, ground, px, opts = {}) {
   ctx.fill();
   ctx.stroke();
 
-  drawWheel(ctx, frontAxle * L, ground, wheelR, opts.spin || 0);
-  drawWheel(ctx, rearAxle * L, ground, wheelR, opts.spin || 0);
+  drawWheel(ctx, frontAxle * L, ground - wheelR, wheelR, opts.spin || 0, "five", "#d5d8de");
+  drawWheel(ctx, rearAxle * L, ground - wheelR, wheelR, opts.spin || 0, "five", "#d5d8de");
   ctx.restore();
 }
 
-function drawWheel(ctx, cx, ground, r, spin) {
+function drawTraced(ctx, car, trace, paint, x, ground, px, opts) {
+  const L = car.length * px;
+  const H = L / trace.aspect;
+  const at = (p) => [p[0] * L, ground - p[1] * H];
   ctx.save();
-  ctx.translate(cx, ground - r);
-  ctx.fillStyle = "#16181c";
+  ctx.translate(x, 0);
+  ctx.fillStyle = "rgba(0,0,0,.22)";
+  ctx.beginPath();
+  ctx.ellipse(L * 0.5, ground + 2, L * 0.38, Math.max(3, px * 0.06), 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  trace.body.forEach((p, i) => {
+    const q = at(p);
+    if (i === 0) ctx.moveTo(q[0], q[1]);
+    else ctx.lineTo(q[0], q[1]);
+  });
+  ctx.closePath();
+  ctx.fillStyle = paint;
+  ctx.fill();
+  ctx.strokeStyle = "rgba(20,22,26,.45)";
+  ctx.lineWidth = Math.max(1, px * 0.01);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(8,10,14,.9)";
+  for (const pane of trace.windows) {
+    ctx.beginPath();
+    pane.forEach((p, i) => {
+      const q = at(p);
+      if (i === 0) ctx.moveTo(q[0], q[1]);
+      else ctx.lineTo(q[0], q[1]);
+    });
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  if (opts.exhaust) {
+    const tail = trace.body.reduce((best, p) => (p[0] > best[0] ? p : best), trace.body[0]);
+    ctx.fillStyle = "#d5d8de";
+    ctx.beginPath();
+    ctx.arc(Math.min(L * 0.985, tail[0] * L), ground - Math.max(0.1, tail[1] * 0.45) * H, Math.max(2, px * 0.035), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const wheel of trace.wheels) {
+    drawWheel(ctx, wheel.x * L, ground - wheel.y * H, wheel.r * H, opts.spin || 0, trace.wheel, trace.rim);
+  }
+  ctx.restore();
+}
+
+function drawWheel(ctx, cx, cy, r, spin, style, rim) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = "#14161a";
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#c8ccd2";
-  ctx.lineWidth = Math.max(1, r * 0.16);
+  const lip = style === "dish" ? 0.2 : style === "mesh" ? 0.09 : 0.13;
+  ctx.strokeStyle = rim || "#d5d8de";
+  ctx.lineWidth = Math.max(1, r * lip);
   ctx.beginPath();
-  ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
+  ctx.arc(0, 0, r * (style === "dish" ? 0.7 : 0.8), 0, Math.PI * 2);
   ctx.stroke();
-  ctx.fillStyle = "#d7dbe1";
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.46, 0, Math.PI * 2);
-  ctx.fill();
   ctx.save();
-  ctx.rotate(spin);
-  ctx.strokeStyle = "#8b919a";
-  ctx.lineWidth = Math.max(1, r * 0.07);
-  for (let i = 0; i < 5; i += 1) {
-    const a = (i / 5) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a) * r * 0.12, Math.sin(a) * r * 0.12);
-    ctx.lineTo(Math.cos(a) * r * 0.4, Math.sin(a) * r * 0.4);
-    ctx.stroke();
+  ctx.rotate(spin || 0);
+  ctx.lineCap = "round";
+  if (style === "mesh") {
+    ctx.strokeStyle = rim || "#d0d4da";
+    ctx.lineWidth = Math.max(1, r * 0.03);
+    for (let i = 0; i < 16; i += 1) {
+      const a = (i / 16) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.18, Math.sin(a) * r * 0.18);
+      ctx.lineTo(Math.cos(a) * r * 0.68, Math.sin(a) * r * 0.68);
+      ctx.stroke();
+    }
+    for (const ring of [0.34, 0.52]) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r * ring, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (style === "star") {
+    ctx.strokeStyle = "#b7bcc4";
+    ctx.lineWidth = Math.max(1, r * 0.055);
+    for (let i = 0; i < 10; i += 1) {
+      const a = (i / 10) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.16, Math.sin(a) * r * 0.16);
+      ctx.lineTo(Math.cos(a) * r * 0.64, Math.sin(a) * r * 0.64);
+      ctx.stroke();
+    }
+  } else {
+    ctx.strokeStyle = style === "dish" ? "#eceff3" : (rim || "#c5c9d0");
+    ctx.lineWidth = Math.max(1.2, r * (style === "dish" ? 0.15 : 0.11));
+    for (let i = 0; i < 5; i += 1) {
+      const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.14, Math.sin(a) * r * 0.14);
+      ctx.lineTo(Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.6);
+      ctx.stroke();
+    }
   }
   ctx.restore();
-  ctx.fillStyle = "#9aa1aa";
+  ctx.fillStyle = "#9aa3ad";
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.12, 0, Math.PI * 2);
   ctx.fill();
@@ -617,16 +720,24 @@ export function drawStrip(ctx, w, h, scene) {
     drawCar(ctx, rival.car, rival.paint, sx(rival.state.x), lanes[0] + laneH * 0.42, px, {
       tireRadius: rival.spec.tireRadius,
       spin: rival.state.x / rival.spec.tireRadius,
-      induction: rival.build?.induction || 0,
-      exhaust: rival.build?.exhaust || 0,
+      ...lookOpts(rival.build),
     });
   }
   drawCar(ctx, player.car, player.paint, sx(player.state.x), lanes[1] + laneH * 0.42, px, {
     tireRadius: player.spec.tireRadius,
     spin: (player.state.x || 0) / player.spec.tireRadius,
-    induction: player.build.induction,
-    exhaust: player.build.exhaust,
+    ...lookOpts(player.build),
   });
+}
+
+function lookOpts(build = {}) {
+  return {
+    induction: build.induction || 0,
+    exhaust: build.exhaust || 0,
+    suspension: build.suspension || 0,
+    tires: build.tires || 0,
+    weight: build.weight || 0,
+  };
 }
 
 export function cameraFor(w, player, rival) {
