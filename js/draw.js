@@ -3,8 +3,8 @@
  *  Sprites are stored nose-left. The strip asks for face "right".
  */
 
-import { sampleCurve } from "./sim.js?v=3";
-import { TRACES } from "./traces.js?v=3";
+import { sampleCurve } from "./sim.js?v=4";
+import { TRACES } from "./traces.js?v=4";
 
 const PHOTO_PACKS = {
   e30: {
@@ -37,13 +37,21 @@ function loadSprite(entry) {
   const done = () => {
     if (settled) return;
     settled = true;
+    if (!entry.profile && img.naturalWidth) {
+      try {
+        preparePhoto(entry);
+      } catch {
+        entry.profile = null;
+      }
+    }
     settleSprite();
   };
   img.onload = done;
   img.onerror = done;
   img.decoding = "async";
-  img.src = new URL(`../assets/cars/${entry.file}?v=3`, import.meta.url).href;
+  img.src = new URL(`../assets/cars/${entry.file}?v=4`, import.meta.url).href;
   entry.img = img;
+  entry.tints = new Map();
   if (img.complete) done();
 }
 
@@ -65,6 +73,216 @@ function photoFor(car, opts) {
   const pack = PHOTO_PACKS[car.shape];
   if (!pack) return null;
   return aeroLook(opts) ? pack.mod : pack.stock;
+}
+
+function lumaOf(r, g, b) {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function hueSat(r, g, b) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const sat = max === 0 ? 0 : (max - min) / max;
+  if (max === min) return { hue: 0, sat };
+  const delta = max - min;
+  let hue;
+  if (max === r) hue = ((g - b) / delta) % 6;
+  else if (max === g) hue = (b - r) / delta + 2;
+  else hue = (r - g) / delta + 4;
+  if (hue < 0) hue += 6;
+  return { hue: hue * 60, sat };
+}
+
+function parseHex(hex) {
+  const value = String(hex || "").replace("#", "");
+  if (value.length < 6) return [20, 22, 28];
+  return [
+    Number.parseInt(value.slice(0, 2), 16),
+    Number.parseInt(value.slice(2, 4), 16),
+    Number.parseInt(value.slice(4, 6), 16),
+  ];
+}
+
+function shadePaint(target, amount) {
+  let mix;
+  if (amount >= 1) mix = Math.min(1, (amount - 1) / 0.8);
+  else mix = -Math.min(1, (1 - amount) / 0.7);
+  return target.map((channel) => {
+    if (mix >= 0) return channel + (255 - channel) * mix;
+    return channel * (1 + 0.9 * mix);
+  });
+}
+
+function findWheels(data, w, h) {
+  const bottoms = new Int16Array(w);
+  bottoms.fill(-1);
+  const px = data.data;
+  for (let x = 0; x < w; x += 1) {
+    for (let y = h - 1; y >= 0; y -= 1) {
+      if (px[(y * w + x) * 4 + 3] > 50) {
+        bottoms[x] = y;
+        break;
+      }
+    }
+  }
+  let ground = 0;
+  for (let x = 0; x < w; x += 1) if (bottoms[x] > ground) ground = bottoms[x];
+  let wheels = [];
+  for (const gapFrac of [0.035, 0.06, 0.09]) {
+    const gap = Math.max(2, Math.round(h * gapFrac));
+    const touch = [];
+    for (let x = 0; x < w; x += 1) {
+      if (bottoms[x] >= 0 && ground - bottoms[x] <= gap) touch.push(x);
+    }
+    const clusters = [];
+    let cur = [];
+    const join = Math.max(4, Math.round(w * 0.008));
+    for (const x of touch) {
+      if (!cur.length || x - cur[cur.length - 1] <= join) cur.push(x);
+      else {
+        clusters.push(cur);
+        cur = [x];
+      }
+    }
+    if (cur.length) clusters.push(cur);
+    const found = [];
+    for (const cluster of clusters) {
+      const width = cluster[cluster.length - 1] - cluster[0];
+      if (width < w * 0.035 || width > w * 0.2) continue;
+      let bottom = 0;
+      for (const x of cluster) if (bottoms[x] > bottom) bottom = bottoms[x];
+      const radius = width / 2;
+      found.push({
+        cx: (cluster[0] + cluster[cluster.length - 1]) / 2,
+        bottom,
+        r: radius,
+      });
+    }
+    if (found.length >= 2) {
+      wheels = found;
+      break;
+    }
+    if (found.length > wheels.length) wheels = found;
+  }
+  if (!wheels.length) return [];
+  const biggest = Math.max(...wheels.map((wheel) => wheel.r));
+  return wheels.map((wheel) => {
+    const r = Math.max(wheel.r, biggest * 0.9) * 1.45;
+    return { cx: wheel.cx, cy: wheel.bottom - r * 0.97, r };
+  });
+}
+
+function profilePaint(image) {
+  const { width: w, height: h, data } = image;
+  const hues = [];
+  const lumas = [];
+  const x0 = Math.floor(w * 0.32);
+  const x1 = Math.floor(w * 0.6);
+  const y0 = Math.floor(h * 0.38);
+  const y1 = Math.floor(h * 0.68);
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3] < 80) continue;
+      const { hue, sat } = hueSat(data[i], data[i + 1], data[i + 2]);
+      const tone = lumaOf(data[i], data[i + 1], data[i + 2]);
+      if (sat > 0.32 && tone > 30 && tone < 200) {
+        hues.push(hue);
+        lumas.push(tone);
+      }
+    }
+  }
+  if (hues.length > w * h * 0.003) {
+    hues.sort((a, b) => a - b);
+    lumas.sort((a, b) => a - b);
+    return {
+      chroma: true,
+      bodyHue: hues[Math.floor(hues.length / 2)],
+      bodyL: lumas[Math.floor(lumas.length / 2)],
+      wheels: [],
+    };
+  }
+  const neutral = [];
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3] < 80) continue;
+      const { sat } = hueSat(data[i], data[i + 1], data[i + 2]);
+      const tone = lumaOf(data[i], data[i + 1], data[i + 2]);
+      if (sat < 0.22 && tone > 70 && tone < 235) neutral.push(tone);
+    }
+  }
+  neutral.sort((a, b) => a - b);
+  return {
+    chroma: false,
+    bodyHue: 0,
+    bodyL: neutral.length ? neutral[Math.floor(neutral.length / 2)] : 160,
+    wheels: findWheels(image, w, h),
+  };
+}
+
+function preparePhoto(entry) {
+  const canvas = document.createElement("canvas");
+  canvas.width = entry.img.naturalWidth;
+  canvas.height = entry.img.naturalHeight;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(entry.img, 0, 0);
+  entry.source = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  entry.profile = profilePaint(entry.source);
+}
+
+function inWheel(x, y, wheels) {
+  for (const wheel of wheels) {
+    const dx = x - wheel.cx;
+    const dy = y - wheel.cy;
+    if (dx * dx + dy * dy <= wheel.r * wheel.r) return true;
+  }
+  return false;
+}
+
+function tintCanvas(entry, hex) {
+  const { width: w, height: h, data: src } = entry.source;
+  const profile = entry.profile;
+  const target = parseHex(hex);
+  const out = new Uint8ClampedArray(src);
+  const bodyL = Math.max(28, profile.bodyL);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      if (src[i + 3] < 24) continue;
+      if (!profile.chroma && inWheel(x, y, profile.wheels)) continue;
+      const { hue, sat } = hueSat(src[i], src[i + 1], src[i + 2]);
+      const tone = lumaOf(src[i], src[i + 1], src[i + 2]);
+      let paintPixel = false;
+      if (profile.chroma) {
+        let dh = Math.abs(hue - profile.bodyHue);
+        if (dh > 180) dh = 360 - dh;
+        paintPixel = tone > 12 && dh < 32 && sat > 0.1;
+      } else {
+        paintPixel = tone > 42 && tone < 253 && sat < 0.3;
+      }
+      if (!paintPixel) continue;
+      const shaded = shadePaint(target, tone / bodyL);
+      out[i] = shaded[0];
+      out[i + 1] = shaded[1];
+      out[i + 2] = shaded[2];
+    }
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  canvas.getContext("2d").putImageData(new ImageData(out, w, h), 0, 0);
+  return canvas;
+}
+
+function paintedSprite(photo, paint) {
+  if (!photo?.profile || !paint) return photo.img;
+  const key = String(paint).toLowerCase();
+  const cached = photo.tints.get(key);
+  if (cached) return cached;
+  const canvas = tintCanvas(photo, key);
+  photo.tints.set(key, canvas);
+  return canvas;
 }
 
 const SHAPES = {
@@ -398,7 +616,7 @@ export function drawCar(ctx, car, paint, x, ground, px, opts = {}) {
   }
   const photo = photoFor(car, localOpts);
   if (photo?.img?.complete && photo.img.naturalWidth) {
-    drawPhoto(ctx, car, photo, localX, ground, px);
+    drawPhoto(ctx, car, photo, paint, localX, ground, px);
     ctx.restore();
     return;
   }
@@ -412,7 +630,7 @@ export function drawCar(ctx, car, paint, x, ground, px, opts = {}) {
   ctx.restore();
 }
 
-function drawPhoto(ctx, car, photo, x, ground, px) {
+function drawPhoto(ctx, car, photo, paint, x, ground, px) {
   const L = car.length * px;
   const H = L / photo.aspect;
   ctx.save();
@@ -422,7 +640,7 @@ function drawPhoto(ctx, car, photo, x, ground, px) {
   ctx.beginPath();
   ctx.ellipse(x + L * 0.5, ground + 1, L * 0.36, Math.max(3, px * 0.05), 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.drawImage(photo.img, x, ground - H, L, H);
+  ctx.drawImage(paintedSprite(photo, paint), x, ground - H, L, H);
   ctx.restore();
 }
 

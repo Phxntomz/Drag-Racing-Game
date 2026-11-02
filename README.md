@@ -2,7 +2,7 @@
 
 A BMW-only drag racing game. You start in a 2008 335i, tune it the way the real platforms are tuned, and race other BMWs.
 
-E30, E36, and E46 side views are the reference photos, cut out and overlaid. The other chassis are original outlines scaled from published length, height, and wheelbase. This is not a BMW product, and it does not use BMW's artwork or 3D models.
+E30, E36, and E46 side views are the reference photos, cut out and overlaid. A paint chip lays that color over the body of the photo. The other chassis are original outlines scaled from published length, height, and wheelbase. This is not a BMW product, and it does not use BMW's artwork or 3D models.
 
 ## Play
 
