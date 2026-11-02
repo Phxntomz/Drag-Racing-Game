@@ -1,6 +1,6 @@
-/** Side profiles traced from the reference photos.
+/** Side profiles traced from the stock photos.
  *  x is 0 at the nose and 1 at the tail. y is 0 at the tire contact.
- *  `mod` is the same chassis with the aero and wheels from the modified photo.
+ *  Drawn only if the stock photo has not loaded. The nose stays on the left.
  */
 
 export const TRACES = {

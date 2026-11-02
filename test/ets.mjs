@@ -1,5 +1,5 @@
 import { CARS, defaultBuild, FAMILIES, partGroups } from "../js/data.js";
-import { compile, findBite, simulate } from "../js/sim.js";
+import { bestSetup, compile, findBite, simulate } from "../js/sim.js";
 
 const BANDS = {
   e30m3: [14.5, 15.5],
@@ -179,6 +179,50 @@ const neutral = compile(starved, stage1, { ...stage1Setup, timing: 1 });
 expect(advanced.hp > stage1Spec.hp, "advanced timing should add power");
 expect(advanced.knockRate > stage1Spec.knockRate, "advanced timing should add knock");
 expect(Math.abs(neutral.hp - stage1Spec.hp) < 0.01, "timing at 1 should match an unset timing");
+
+const stockCar = CARS.find((car) => car.id === "e90335");
+const plain = defaultBuild();
+const plainProbe = compile(stockCar, plain, {
+  launchRpm: 2000,
+  shiftRpm: Math.round(stockCar.redline * 0.985),
+  psi: 32,
+  boost: 1,
+  fdTrim: 1,
+  timing: 1,
+});
+const plainSetup = {
+  launchRpm: plainProbe.suggestedLaunch,
+  shiftRpm: Math.round(stockCar.redline * 0.985),
+  psi: plainProbe.idealPsi,
+  boost: 1,
+  fdTrim: 1,
+  timing: 1,
+};
+const plainSlip = simulate(compile(stockCar, plain, plainSetup), {
+  rt: 0,
+  launchRpm: plainSetup.launchRpm,
+  shiftRpm: plainSetup.shiftRpm,
+});
+const tuneStarted = performance.now();
+const tuned = bestSetup(stockCar, plain, 0);
+const tuneMs = performance.now() - tuneStarted;
+const tunedSpec = compile(stockCar, plain, tuned);
+const tunedSlip = simulate(tunedSpec, { rt: 0, launchRpm: tuned.launchRpm, shiftRpm: tuned.shiftRpm });
+expect(tuned.launchRpm === tunedSpec.suggestedLaunch, "best tune keeps the launch on the bite");
+expect(tuned.psi === tunedSpec.idealPsi, "best tune keeps tire pressure on the bite");
+expect(!tunedSlip.dnf && tunedSlip.quarter, "best tune should finish the quarter");
+expect(tunedSlip.quarter <= plainSlip.quarter + 0.005, "best tune should not be slower than the bite pass");
+console.log(
+  `best tune 335 ${tunedSlip.quarter.toFixed(3)} vs bite ${plainSlip.quarter.toFixed(3)} in ${tuneMs.toFixed(0)} ms`,
+  tuned,
+);
+
+const e30 = CARS.find((car) => car.id === "e30m3");
+const e30Build = { ...defaultBuild(), suspension: 1, tires: 2, weight: 1 };
+const e30Tune = bestSetup(e30, e30Build, 0);
+const e30Spec = compile(e30, e30Build, e30Tune);
+expect(e30Tune.launchRpm === e30Spec.suggestedLaunch, "a lowered E30 still launches on the bite");
+expect(!simulate(e30Spec, { rt: 0, launchRpm: e30Tune.launchRpm, shiftRpm: e30Tune.shiftRpm }).dnf, "lowered E30 best tune should finish");
 
 if (failures.length) {
   console.error(failures.join("\n"));

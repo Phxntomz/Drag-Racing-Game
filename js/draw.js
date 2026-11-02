@@ -3,22 +3,13 @@
  *  Sprites are stored nose-left. The strip asks for face "right".
  */
 
-import { sampleCurve } from "./sim.js?v=4";
-import { TRACES } from "./traces.js?v=4";
+import { sampleCurve } from "./sim.js?v=5";
+import { TRACES } from "./traces.js?v=5";
 
 const PHOTO_PACKS = {
-  e30: {
-    stock: { file: "e30-stock.png", aspect: 1180 / 382 },
-    mod: { file: "e30-mod.png", aspect: 1097 / 342 },
-  },
-  e36: {
-    stock: { file: "e36-stock.png", aspect: 1400 / 431 },
-    mod: { file: "e36-mod.png", aspect: 462 / 137 },
-  },
-  e46: {
-    stock: { file: "e46-stock.png", aspect: 800 / 259 },
-    mod: { file: "e46-mod.png", aspect: 795 / 249 },
-  },
+  e30: { file: "e30-stock.png", aspect: 1180 / 382 },
+  e36: { file: "e36-stock.png", aspect: 1400 / 431 },
+  e46: { file: "e46-stock.png", aspect: 800 / 259 },
 };
 
 const spriteListeners = new Set();
@@ -49,30 +40,21 @@ function loadSprite(entry) {
   img.onload = done;
   img.onerror = done;
   img.decoding = "async";
-  img.src = new URL(`../assets/cars/${entry.file}?v=4`, import.meta.url).href;
+  img.src = new URL(`../assets/cars/${entry.file}?v=5`, import.meta.url).href;
   entry.img = img;
   entry.tints = new Map();
   if (img.complete) done();
 }
 
-for (const pack of Object.values(PHOTO_PACKS)) {
-  loadSprite(pack.stock);
-  loadSprite(pack.mod);
-}
+for (const pack of Object.values(PHOTO_PACKS)) loadSprite(pack);
 
 export function onCarSprites(fn) {
   spriteListeners.add(fn);
   if (spritesLeft === 0) fn();
 }
 
-function aeroLook(opts) {
-  return (opts.suspension >= 1) || (opts.tires >= 2) || (opts.weight >= 1);
-}
-
-function photoFor(car, opts) {
-  const pack = PHOTO_PACKS[car.shape];
-  if (!pack) return null;
-  return aeroLook(opts) ? pack.mod : pack.stock;
+function photoFor(car) {
+  return PHOTO_PACKS[car.shape] || null;
 }
 
 function lumaOf(r, g, b) {
@@ -587,19 +569,16 @@ export function spriteHeight(car, opts = {}) {
   return car.length / trace.aspect;
 }
 
-function traceFor(car, opts) {
+function traceFor(car) {
   const pack = TRACES[car.shape];
   if (!pack) return null;
-  const aero = (opts.suspension >= 1) || (opts.tires >= 2) || (opts.weight >= 1);
-  const src = aero && pack.mod ? pack.mod : pack;
-  const dressed = aero || (opts.tires >= 1);
   return {
-    aspect: src.aspect,
-    body: src.body,
-    windows: src.windows,
-    wheels: src.wheels,
-    wheel: dressed && pack.mod ? pack.mod.wheel : pack.wheel,
-    rim: dressed && pack.mod ? pack.mod.rim : pack.rim,
+    aspect: pack.aspect,
+    body: pack.body,
+    windows: pack.windows,
+    wheels: pack.wheels,
+    wheel: pack.wheel,
+    rim: pack.rim,
   };
 }
 

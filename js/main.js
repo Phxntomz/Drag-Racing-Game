@@ -16,10 +16,10 @@ import {
   tierNote,
   tierPrice,
   unmetRequires,
-} from "./data.js?v=4";
-import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=4";
-import { artKind, partFigure } from "./art.js?v=4";
-import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=4";
+} from "./data.js?v=5";
+import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=5";
+import { artKind, partFigure } from "./art.js?v=5";
+import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=5";
 import {
   EIGHTH,
   FT1000,
@@ -31,10 +31,11 @@ import {
   createState,
   formatEt,
   sampleCurve,
+  bestSetup,
   simulate,
   step,
-} from "./sim.js?v=4";
-import { clearSave, readSave, writeSave } from "./save.js?v=4";
+} from "./sim.js?v=5";
+import { clearSave, readSave, writeSave } from "./save.js?v=5";
 
 let storageBlocked = false;
 let keepState = "fresh";
@@ -431,6 +432,23 @@ function coolCar(item) {
   paint();
 }
 
+function applyBestTune(item) {
+  const car = carById(item.carId);
+  const next = bestSetup(car, item.build, item.heat || 0);
+  item.setup = {
+    ...(item.setup || {}),
+    launchRpm: next.launchRpm,
+    shiftRpm: next.shiftRpm,
+    psi: next.psi,
+    boost: next.boost,
+    fdTrim: next.fdTrim,
+    timing: next.timing,
+    gears: item.build.gearing ? null : item.setup?.gears || null,
+  };
+  persist();
+  paint();
+}
+
 function renderDyno(item) {
   const panel = el("div", { class: "panel" }, [
     el("p", { class: "kicker" }, "Dyno"),
@@ -441,6 +459,7 @@ function renderDyno(item) {
   ]);
   const row = el("div", { class: "row", style: "margin-top:14px" });
   row.append(button("Pull the dyno", () => startDyno(item), "btn"));
+  row.append(button("Best tune", () => applyBestTune(item), "btn"));
   if (item.heat) row.append(button("Cool the car", () => coolCar(item), "btn btn-ghost"));
   row.append(button("Race this tune", () => go("strip"), "btn btn-ghost"));
   panel.append(row);
@@ -599,10 +618,10 @@ function renderSetup(item, car, spec) {
     });
   }
   const row = el("div", { class: "row", style: "margin-top:14px" });
+  row.append(button("Best tune", () => applyBestTune(item), "btn"));
   row.append(button("Set the launch to the bite", () => {
     item.setup.launchRpm = spec.suggestedLaunch;
     item.setup.psi = spec.idealPsi;
-    item.setup.timing = 1;
     persist();
     paint();
   }, "btn btn-ghost"));
@@ -1586,6 +1605,7 @@ function drawMounted() {
       weight: Number(node.dataset.weight || 0),
     };
     const px = Math.min((h * 0.72) / spriteHeight(car, look), (w - 16) / car.length);
+    // Every lot and garage card is nose-left, the same direction as the stock photos.
     drawCar(ctx, car, node.dataset.paint || "#14161c", (w - car.length * px) / 2, h * 0.86, px, look);
   });
 }

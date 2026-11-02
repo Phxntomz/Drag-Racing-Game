@@ -2,7 +2,7 @@
 
 A BMW-only drag racing game. You start in a 2008 335i, tune it the way the real platforms are tuned, and race other BMWs.
 
-E30, E36, and E46 side views are the reference photos, cut out and overlaid. A paint chip lays that color over the body of the photo. The other chassis are original outlines scaled from published length, height, and wheelbase. This is not a BMW product, and it does not use BMW's artwork or 3D models.
+E30, E36, and E46 side views stay on the stock photo. A paint chip lays that color over the body. The other chassis are original outlines scaled from published length, height, and wheelbase. This is not a BMW product, and it does not use BMW's artwork or 3D models.
 
 ## Play
 
@@ -18,12 +18,12 @@ The server prints a local address. Open that address in the same machine’s bro
 
 - **Garage** is the car in the bay: paint, name, the window sticker, and the dyno for that car.
 - **Dyno** pulls the rollers. The gray line is stock. Cool the car if the last pass is still in the sheet.
-- **Shop** holds the tune, the maps, and the parts. Tune is launch, shift, timing, tire pressure, boost, and, once the gears are swapped, each ratio. Maps are flashed like an OTS file. Hardware is sold three ways: a cheap part, a name-brand part, and a works part. The cheap ones make a little less power and fail sooner.
+- **Shop** holds the tune, the maps, and the parts. Tune is launch, shift, timing, tire pressure, boost, and, once the gears are swapped, each ratio. Best tune sets those for the quickest clean pass and leaves the launch on the bite. Maps are flashed like an OTS file. Hardware is sold three ways: a cheap part, a name-brand part, and a works part. The cheap ones make a little less power and fail sooner.
 - **Strip** is a full 0.500 tree or a 0.400 pro tree. Space launches. Shift or the up arrow grabs the next gear on a manual. DCT, ZF, and SMG cars shift themselves at the rpm you set.
 - **Slips** keeps each pass as a timeslip.
 - **Lot** sells the rest of the roster. Prices are game money.
 
-Suspension, a drag-radial tire, or a weight cut swaps an E30, E36, or E46 to the modified photo. On the strip every car points downtrack. The other chassis keep their own nose, greenhouse, and deck.
+On the strip every car points downtrack. In the lot every car points the same way, nose to the left. The other chassis keep their own nose, greenhouse, and deck.
 
 A red light loses. Power past the fuel system or the bottom end knocks, and an axle that is too small breaks on the hit.
 

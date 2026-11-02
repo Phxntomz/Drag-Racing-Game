@@ -8,7 +8,7 @@
  * limit are the tuning outputs.
  */
 
-import { FAMILIES, partTier } from "./data.js?v=4";
+import { FAMILIES, partTier } from "./data.js?v=5";
 
 export const FT60 = 18.288;
 export const FT330 = 100.584;
@@ -509,6 +509,65 @@ export function simulate(spec, plan = {}) {
   slip.finishRpm = state.rpm;
   slip.finishGear = state.gear;
   return slip;
+}
+
+function shiftFor(car, mark) {
+  return Math.round(Math.round(car.redline * mark) / 10) * 10;
+}
+
+export function bestSetup(car, build, heat = 0) {
+  const shiftMarks = [0.94, 0.97, 0.985, 1];
+  const timings = [1, 1.03, 1.06];
+  const boosted = Boolean(car.turbo || car.spoolRpm || build?.induction >= 2);
+  const boosts = boosted ? [1, 1.04, 1.08, 1.12] : [1];
+  const fds = build?.gearing ? [0.94, 1, 1.06, 1.12] : [1];
+  let best = null;
+  for (const shiftMark of shiftMarks) {
+    for (const timing of timings) {
+      for (const boost of boosts) {
+        for (const fdTrim of fds) {
+          const setup = {
+            launchRpm: 2000,
+            shiftRpm: shiftFor(car, shiftMark),
+            psi: 32,
+            boost,
+            fdTrim,
+            timing,
+            gears: null,
+          };
+          const probe = compile(car, build, setup, heat);
+          setup.psi = probe.idealPsi;
+          const spec = compile(car, build, setup, heat);
+          const launchRpm = spec.suggestedLaunch;
+          setup.launchRpm = launchRpm;
+          const slip = simulate(spec, { rt: 0, launchRpm, shiftRpm: setup.shiftRpm });
+          if (!slip.quarter || slip.dnf) continue;
+          const risk = Math.abs(timing - 1) + Math.abs(boost - 1) * 0.4 + Math.abs(fdTrim - 1) * 0.15;
+          const quicker = !best || slip.quarter < best.et - 0.008;
+          const tied = best && Math.abs(slip.quarter - best.et) <= 0.008 && risk < best.risk;
+          if (quicker || tied) best = { et: slip.quarter, risk, setup: { ...setup } };
+        }
+      }
+    }
+  }
+  if (best) return best.setup;
+  const fallback = compile(car, build, {
+    launchRpm: 2000,
+    shiftRpm: shiftFor(car, 0.985),
+    psi: 32,
+    boost: 1,
+    fdTrim: 1,
+    timing: 1,
+  }, heat);
+  return {
+    launchRpm: fallback.suggestedLaunch,
+    shiftRpm: shiftFor(car, 0.985),
+    psi: fallback.idealPsi,
+    boost: 1,
+    fdTrim: 1,
+    timing: 1,
+    gears: null,
+  };
 }
 
 export function findBite(spec) {

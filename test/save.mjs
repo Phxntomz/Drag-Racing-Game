@@ -34,7 +34,7 @@ const played = {
       paint: "alpine",
       name: "Track E30",
       build: { software: 2, exhaust: 1, tires: 1 },
-      setup: { launchRpm: 4100, shiftRpm: 7000, psi: 18, boost: 1, fdTrim: 1.05 },
+      setup: { launchRpm: 4100, shiftRpm: 7000, psi: 18, boost: 1, fdTrim: 1.05, timing: 1.03, gears: [1, 0.98] },
       damage: "axle",
       heat: 1,
     },
@@ -49,6 +49,7 @@ if (loaded.save.cash !== 4200) throw new Error("cash was not restored");
 if (loaded.save.cars.length !== 1 || loaded.save.cars[0].name !== "Track E30") throw new Error("car was not restored");
 if (loaded.save.cars[0].build.software !== 2 || loaded.save.cars[0].build.intake !== 0) throw new Error("build was not restored");
 if (loaded.save.cars[0].setup.launchRpm !== 4100 || loaded.save.cars[0].setup.fdTrim !== 1.05) throw new Error("setup was not restored");
+if (loaded.save.cars[0].setup.timing !== 1.03 || loaded.save.cars[0].setup.gears[1] !== 0.98) throw new Error("timing and gears were not restored");
 if (loaded.save.cars[0].damage !== "axle" || loaded.save.cars[0].heat !== 1) throw new Error("damage or heat was not restored");
 if (loaded.save.active !== "mine") throw new Error("active car should fall back to the car that exists");
 if (loaded.save.slips[0].quarter !== 13.2) throw new Error("timeslip was not restored");

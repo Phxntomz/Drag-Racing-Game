@@ -3,7 +3,7 @@
  * The file lives in this browser's localStorage, so the same link reloads
  * cash, cars, parts, setup, and slips. A second copy is kept beside it.
  */
-import { defaultBuild } from "./data.js?v=4";
+import { defaultBuild } from "./data.js?v=5";
 
 export const SAVE_KEY = "bimmer-strip-v1";
 export const BACKUP_KEY = "bimmer-strip-v1-backup";
@@ -54,7 +54,11 @@ function normalizeCar(car) {
       psi: finite(car.setup.psi, 32),
       boost: finite(car.setup.boost, 1),
       fdTrim: finite(car.setup.fdTrim, 1),
+      timing: finite(car.setup.timing, 1),
     };
+    if (Array.isArray(car.setup.gears)) {
+      setup.gears = car.setup.gears.map((value) => finite(value, 1));
+    }
   }
   return {
     uid: String(car.uid),
