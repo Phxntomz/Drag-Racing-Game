@@ -8,7 +8,7 @@
  * limit are the tuning outputs.
  */
 
-import { FAMILIES, partTier } from "./data.js?v=7";
+import { FAMILIES, partTier } from "./data.js?v=8";
 
 export const FT60 = 18.288;
 export const FT330 = 100.584;
@@ -28,10 +28,10 @@ const TIRE = {
 };
 
 const TRANS = {
-  manual: { eff: 0.9, shift: 0.26, dump: 0.28, auto: false },
-  dct: { eff: 0.91, shift: 0.065, dump: 0.14, auto: true },
-  auto: { eff: 0.88, shift: 0.1, dump: 0.18, auto: true },
-  smg: { eff: 0.89, shift: 0.13, dump: 0.2, auto: true },
+  manual: { eff: 0.9, shift: 0.26, dump: 0.28 },
+  dct: { eff: 0.91, shift: 0.065, dump: 0.14 },
+  auto: { eff: 0.88, shift: 0.1, dump: 0.18 },
+  smg: { eff: 0.89, shift: 0.13, dump: 0.2 },
 };
 
 export function engineTorque(spec, rpm) {
@@ -179,7 +179,6 @@ export function compile(car, build, setup, heat = 0) {
     eff: trans.eff - (car.drive === "awd" ? 0.03 : 0),
     shiftTime: trans.shift * shiftMul,
     dumpTime: trans.dump * dumpMul,
-    autoShift: trans.auto,
     tireRadius: tire.radius,
     mu,
     bite,

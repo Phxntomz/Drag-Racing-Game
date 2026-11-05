@@ -1162,9 +1162,9 @@ function transName(trans) {
 }
 
 function transNote(trans) {
-  if (trans === DCT) return "Dual-clutch. Shifts are short. Your job is the light and the setup.";
-  if (trans === AUTO) return "ZF eight-speed. It shifts itself in this game, quicker than a hand, slower than a DCT.";
-  if (trans === SMG) return "Single-clutch automated manual. Faster than a missed hand shift, clumsier than a DCT.";
+  if (trans === DCT) return "Dual-clutch. You still grab the next gear. The shift itself is short.";
+  if (trans === AUTO) return "ZF eight-speed. You still grab the next gear. The shift is quicker than a hand, slower than a DCT.";
+  if (trans === SMG) return "Single-clutch automated manual. You still grab the next gear. Faster than a missed hand shift, clumsier than a DCT.";
   return "You shift it. The powerband only helps if the next gear lands in it.";
 }
 

@@ -19,7 +19,7 @@ The server prints a local address. Open that address in the same machine’s bro
 - **Garage** is the car in the bay: paint, name, the window sticker, and the dyno for that car.
 - **Dyno** pulls the rollers. The gray line is stock. Cool the car if the last pass is still in the sheet.
 - **Shop** holds the tune, the maps, and the parts. Tune is launch, shift, timing, tire pressure, boost, and, once the gears are swapped, each ratio. Best tune sets those for the quickest clean pass and leaves the launch on the bite. Maps are flashed like an OTS file. Hardware is sold three ways: a cheap part, a name-brand part, and a works part. The cheap ones make a little less power and fail sooner.
-- **Strip** is a full 0.500 tree or a 0.400 pro tree. Space launches. Shift or the up arrow grabs the next gear on a manual. DCT, ZF, and SMG cars shift themselves at the rpm you set.
+- **Strip** is a full 0.500 tree or a 0.400 pro tree. Space launches. Shift or the up arrow grabs the next gear on every car. DCT, ZF, and SMG cars shift faster, and you still row them.
 - **Slips** keeps each pass as a timeslip.
 - **Lot** sells the rest of the roster. Prices are game money.
 

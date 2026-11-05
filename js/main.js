@@ -16,10 +16,10 @@ import {
   tierNote,
   tierPrice,
   unmetRequires,
-} from "./data.js?v=7";
-import { beep, breakSound, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=7";
-import { artKind, partFigure } from "./art.js?v=7";
-import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=7";
+} from "./data.js?v=8";
+import { beep, breakSound, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=8";
+import { artKind, partFigure } from "./art.js?v=8";
+import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=8";
 import {
   EIGHTH,
   FT1000,
@@ -34,8 +34,8 @@ import {
   bestSetup,
   simulate,
   step,
-} from "./sim.js?v=7";
-import { clearSave, readSave, writeSave } from "./save.js?v=7";
+} from "./sim.js?v=8";
+import { clearSave, readSave, writeSave } from "./save.js?v=8";
 
 let storageBlocked = false;
 let keepState = "fresh";
@@ -749,10 +749,7 @@ function renderStrip() {
   const legal = canEnter(item.build, classId);
   if (!night || night.classId !== classId || night.against !== item.uid) rollNight();
 
-  const shiftHint = spec.autoShift
-    ? "This gearbox shifts itself at the rpm you set in the shop."
-    : "Shift or the up arrow grabs the next gear. Space launches.";
-  app.append(head("Strip", item.name, `Full tree is a 0.500 cadence. Pro tree is 0.400. Leave on the last amber and it is a red light. ${shiftHint}`));
+  app.append(head("Strip", item.name, "Full tree is a 0.500 cadence. Pro tree is a 0.400. Leave on the last amber and it is a red light. Shift or the up arrow grabs the next gear. Space launches."));
 
   const tree = el("div", { class: "tree-box", id: "tree" }, [
     bulb("pre"), bulb("stage"), bulb("amber"), bulb("amber"), bulb("amber"), bulb("green"), bulb("red"),
@@ -1035,13 +1032,9 @@ function integrate(dt) {
   }
 
 function consumeShift(player) {
-  const spec = player.spec;
   const state = player.state;
-  let shift = race.shiftEdge;
+  const shift = race.shiftEdge;
   race.shiftEdge = false;
-  if (spec.autoShift && state.launched && state.shiftLeft <= 0 && state.rpm >= spec.shiftRpm && state.runT > spec.dumpTime) {
-    shift = true;
-  }
   if (shift) player.shifts.push(Math.round(state.rpm));
   return shift;
 }
