@@ -54,6 +54,47 @@ export function engineRpm(rpm, throttle) {
   engineGain.gain.setTargetAtTime(target, audio.currentTime, 0.05);
 }
 
+export function breakSound(kind) {
+  if (muted) return;
+  const audio = context();
+  stopEngine();
+  const now = audio.currentTime;
+  const snap = kind === "engine" ? 240 : 96;
+  const hits = kind === "engine" ? [0, 0.08, 0.15] : [0, 0.04];
+  for (const at of hits) {
+    const osc = audio.createOscillator();
+    const amp = audio.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(snap, now + at);
+    osc.frequency.exponentialRampToValueAtTime(34, now + at + 0.14);
+    amp.gain.setValueAtTime(0.0001, now + at);
+    amp.gain.exponentialRampToValueAtTime(0.2, now + at + 0.008);
+    amp.gain.exponentialRampToValueAtTime(0.0001, now + at + 0.16);
+    osc.connect(amp);
+    amp.connect(audio.destination);
+    osc.start(now + at);
+    osc.stop(now + at + 0.18);
+  }
+  const length = Math.floor(audio.sampleRate * (kind === "engine" ? 0.32 : 0.2));
+  const buffer = audio.createBuffer(1, length, audio.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) {
+    const env = (1 - i / length) ** (kind === "engine" ? 1.3 : 4);
+    data[i] = (Math.random() * 2 - 1) * env;
+  }
+  const noise = audio.createBufferSource();
+  noise.buffer = buffer;
+  const filter = audio.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = kind === "engine" ? 900 : 220;
+  const noiseAmp = audio.createGain();
+  noiseAmp.gain.value = kind === "engine" ? 0.16 : 0.32;
+  noise.connect(filter);
+  filter.connect(noiseAmp);
+  noiseAmp.connect(audio.destination);
+  noise.start();
+}
+
 export function stopEngine() {
   if (!engine || !ctx) return;
   const old = engine;

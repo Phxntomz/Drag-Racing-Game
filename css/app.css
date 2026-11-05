@@ -525,6 +525,20 @@ a:hover { text-decoration: underline; }
   font-weight: 680;
 }
 
+.cell.is-fail {
+  background: #e23d3d;
+  animation: fail-pulse 0.7s ease-out 3;
+}
+
+.cell.is-fail span { color: #ffe4e4; }
+
+.cell.is-fail b { color: #fff; }
+
+@keyframes fail-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(226, 61, 61, 0.75); }
+  100% { box-shadow: 0 0 0 12px rgba(226, 61, 61, 0); }
+}
+
 .tach {
   position: relative;
   height: 10px;

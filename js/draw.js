@@ -3,8 +3,8 @@
  *  Sprites are stored nose-left. The strip asks for face "right".
  */
 
-import { sampleCurve } from "./sim.js?v=6";
-import { TRACES } from "./traces.js?v=6";
+import { sampleCurve } from "./sim.js?v=7";
+import { TRACES } from "./traces.js?v=7";
 
 const PHOTO_PACKS = {
   e30: { file: "e30-stock.png", aspect: 1180 / 382 },
@@ -40,7 +40,7 @@ function loadSprite(entry) {
   img.onload = done;
   img.onerror = done;
   img.decoding = "async";
-  img.src = new URL(`../assets/cars/${entry.file}?v=6`, import.meta.url).href;
+  img.src = new URL(`../assets/cars/${entry.file}?v=7`, import.meta.url).href;
   entry.img = img;
   entry.tints = new Map();
   if (img.complete) done();

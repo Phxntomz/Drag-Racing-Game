@@ -16,10 +16,10 @@ import {
   tierNote,
   tierPrice,
   unmetRequires,
-} from "./data.js?v=6";
-import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=6";
-import { artKind, partFigure } from "./art.js?v=6";
-import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=6";
+} from "./data.js?v=7";
+import { beep, breakSound, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=7";
+import { artKind, partFigure } from "./art.js?v=7";
+import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=7";
 import {
   EIGHTH,
   FT1000,
@@ -34,8 +34,8 @@ import {
   bestSetup,
   simulate,
   step,
-} from "./sim.js?v=6";
-import { clearSave, readSave, writeSave } from "./save.js?v=6";
+} from "./sim.js?v=7";
+import { clearSave, readSave, writeSave } from "./save.js?v=7";
 
 let storageBlocked = false;
 let keepState = "fresh";
@@ -1008,6 +1008,7 @@ function tick(dt) {
       race.clock += dt;
     }
     integrate(dt);
+    noteBreak();
     if (finished()) finish();
   }
   paintBulbs();
@@ -1064,6 +1065,17 @@ function noteTraps(bucket, clock, frameDt) {
     }
   }
   bucket.prevX = state.x;
+}
+
+function noteBreak() {
+  const state = race.player.state;
+  if (state.axle && !race.heardAxle) {
+    race.heardAxle = true;
+    breakSound("axle");
+  } else if (state.blown && !race.heardEngine && !race.heardAxle) {
+    race.heardEngine = true;
+    breakSound("engine");
+  }
 }
 
 function finished() {
@@ -1225,7 +1237,9 @@ function paintReadout() {
   gear.textContent = state.launched ? String(state.gear) : "—";
   speed.textContent = `${Math.round(state.v * 2.23694)} mph`;
   rpm.textContent = `${Math.round(state.rpm)} rpm`;
-  flag.textContent = race.red ? "Red light" : state.axle ? "Axle" : state.blown ? "Engine" : state.spin ? "Tires loose" : state.knock > 0.45 ? "Knock" : state.shiftLeft > 0 ? "Shift" : "—";
+  const broke = state.axle ? "Axle broke" : state.blown ? "Engine let go" : "";
+  flag.textContent = broke || (race.red ? "Red light" : state.spin ? "Tires loose" : state.knock > 0.45 ? "Knock" : state.shiftLeft > 0 ? "Shift" : "—");
+  flag.parentElement.classList.toggle("is-fail", Boolean(broke));
   const ratio = Math.max(0, Math.min(1, state.rpm / spec.redline));
   fill.style.width = `${ratio * 100}%`;
   mark.style.left = `${(spec.shiftRpm / spec.redline) * 100}%`;
