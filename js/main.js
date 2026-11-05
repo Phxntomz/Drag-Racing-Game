@@ -16,10 +16,10 @@ import {
   tierNote,
   tierPrice,
   unmetRequires,
-} from "./data.js?v=5";
-import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=5";
-import { artKind, partFigure } from "./art.js?v=5";
-import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=5";
+} from "./data.js?v=6";
+import { beep, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=6";
+import { artKind, partFigure } from "./art.js?v=6";
+import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=6";
 import {
   EIGHTH,
   FT1000,
@@ -34,8 +34,8 @@ import {
   bestSetup,
   simulate,
   step,
-} from "./sim.js?v=5";
-import { clearSave, readSave, writeSave } from "./save.js?v=5";
+} from "./sim.js?v=6";
+import { clearSave, readSave, writeSave } from "./save.js?v=6";
 
 let storageBlocked = false;
 let keepState = "fresh";
@@ -148,6 +148,13 @@ function FAMILIES_FALLBACK(car) {
   return car.turbo || car.spoolRpm ? car.spoolRpm + 700 : car.tqPeakRpm;
 }
 
+function passText(slip) {
+  if (slip?.quarter) return `${formatEt(slip.quarter)} at ${slip.quarterMph.toFixed(1)} mph`;
+  if (slip?.dnf === "axle" || slip?.axle) return "Axle broke";
+  if (slip?.dnf === "engine" || slip?.blown) return "Engine let go";
+  return "Won't finish";
+}
+
 function preview(item) {
   const car = carById(item.carId);
   const setup = resolveSetup(car, item);
@@ -248,7 +255,7 @@ function renderGarage() {
     line("Redline", `${car.redline.toLocaleString("en-US")} rpm`),
     line("Weight", `${Math.round(spec.mass).toLocaleString("en-US")} kg`),
     line("Gearbox", transLabel(car.trans)),
-    line("Perfect pass", slip.quarter ? `${formatEt(slip.quarter)} at ${slip.quarterMph.toFixed(1)} mph` : "Won't finish"),
+    line("Perfect pass", passText(slip)),
     line("Published", car.published),
   ]);
   if (item.damage) {
@@ -372,7 +379,7 @@ function fillTuneStats(item) {
     line("Bite", `${spec.suggestedLaunch} rpm`),
     line("Your launch", `${Math.round(setup.launchRpm)} rpm`),
     line("Timing", `${((((setup.timing ?? 1) - 1) / 0.03) > 0 ? "+" : "")}${(((setup.timing ?? 1) - 1) / 0.03).toFixed(1)}°`),
-    line("Vehicle quarter", slip.quarter ? `${formatEt(slip.quarter)} at ${slip.quarterMph.toFixed(1)} mph` : "Won't finish"),
+    line("Vehicle quarter", passText(slip)),
     line("60 foot", formatEt(slip.ft60)),
     line("Class", className(classForBuild(item.build))),
   );
@@ -1104,7 +1111,7 @@ function finish() {
   const heading = outcome === "win" ? "Win" : outcome === "loss" ? "Loss" : "Timeslip";
   result.replaceChildren(el("div", { class: "panel", style: "margin-top:12px;background:#fff;color:#17191d" }, [
     el("p", { class: "kicker" }, heading),
-    el("h2", { class: "title" }, slip.quarter ? `${formatEt(slip.quarter)} at ${slip.quarterMph.toFixed(1)} mph` : "No finish"),
+    el("h2", { class: "title" }, passText(slip)),
     renderSlipTable(slip, rivalSlip),
     ...notes.map((note) => el("p", { class: "lead" }, note)),
     el("div", { class: "row", style: "margin-top:12px" }, [
@@ -1218,7 +1225,7 @@ function paintReadout() {
   gear.textContent = state.launched ? String(state.gear) : "—";
   speed.textContent = `${Math.round(state.v * 2.23694)} mph`;
   rpm.textContent = `${Math.round(state.rpm)} rpm`;
-  flag.textContent = race.red ? "Red light" : state.spin ? "Tires loose" : state.knock > 0.45 ? "Knock" : state.shiftLeft > 0 ? "Shift" : "—";
+  flag.textContent = race.red ? "Red light" : state.axle ? "Axle" : state.blown ? "Engine" : state.spin ? "Tires loose" : state.knock > 0.45 ? "Knock" : state.shiftLeft > 0 ? "Shift" : "—";
   const ratio = Math.max(0, Math.min(1, state.rpm / spec.redline));
   fill.style.width = `${ratio * 100}%`;
   mark.style.left = `${(spec.shiftRpm / spec.redline) * 100}%`;

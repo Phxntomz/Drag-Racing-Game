@@ -224,6 +224,45 @@ const e30Spec = compile(e30, e30Build, e30Tune);
 expect(e30Tune.launchRpm === e30Spec.suggestedLaunch, "a lowered E30 still launches on the bite");
 expect(!simulate(e30Spec, { rt: 0, launchRpm: e30Tune.launchRpm, shiftRpm: e30Tune.shiftRpm }).dnf, "lowered E30 best tune should finish");
 
+function bolted(carId) {
+  const car = CARS.find((item) => item.id === carId);
+  const build = {
+    ...defaultBuild(),
+    software: 2,
+    intake: 1,
+    exhaust: 1,
+    cooling: 1,
+    fuel: 1,
+    quality: { software: "works", intake: "works", exhaust: "works", cooling: "works", fuel: "works" },
+  };
+  const setup = {
+    launchRpm: 2000,
+    shiftRpm: Math.round(car.redline * 0.985),
+    psi: 32,
+    boost: 1.12,
+    fdTrim: 1,
+    timing: 1.06,
+  };
+  const seed = compile(car, build, setup);
+  const tuned = { ...setup, launchRpm: seed.suggestedLaunch, psi: seed.idealPsi };
+  const spec = compile(car, build, tuned);
+  return simulate(spec, { rt: 0, launchRpm: tuned.launchRpm, shiftRpm: tuned.shiftRpm });
+}
+
+for (const id of ["f80m3", "g20m340", "g80m3", "e90335"]) {
+  const slip = bolted(id);
+  expect(slip.quarter && !slip.dnf, `${id} stage 2 on stock axles should finish, got ${slip.dnf || "no quarter"}`);
+}
+
+const big = CARS.find((item) => item.id === "e90335");
+const bigBuild = { ...defaultBuild(), software: 2, intake: 1, exhaust: 1, cooling: 1, fuel: 2, induction: 2, clutch: 2, bottom: 1 };
+const bigSeed = compile(big, bigBuild, { launchRpm: 2500, shiftRpm: 6800, psi: 18, boost: 1.08, fdTrim: 1, timing: 1 });
+const bigSetup = { launchRpm: bigSeed.suggestedLaunch, shiftRpm: 6800, psi: bigSeed.idealPsi, boost: 1.08, fdTrim: 1, timing: 1 };
+const snapped = simulate(compile(big, bigBuild, bigSetup), { rt: 0, launchRpm: bigSetup.launchRpm, shiftRpm: 6800 });
+expect(snapped.dnf === "axle", "a big-turbo 335 on stock axles should break an axle");
+const held = simulate(compile(big, { ...bigBuild, driveline: 2 }, bigSetup), { rt: 0, launchRpm: bigSetup.launchRpm, shiftRpm: 6800 });
+expect(held.quarter && !held.dnf, "drag axles should hold that same big-turbo 335");
+
 if (failures.length) {
   console.error(failures.join("\n"));
   process.exit(1);

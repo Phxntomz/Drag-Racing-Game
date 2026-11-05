@@ -8,7 +8,7 @@
  * limit are the tuning outputs.
  */
 
-import { FAMILIES, partTier } from "./data.js?v=5";
+import { FAMILIES, partTier } from "./data.js?v=6";
 
 export const FT60 = 18.288;
 export const FT330 = 100.584;
@@ -124,7 +124,7 @@ export function compile(car, build, setup, heat = 0) {
   const life = Math.max(0.62, 1 - hardware.fragile * 0.08) * (1 + hardware.stout * 0.03);
   const clutchMul = (build.clutch === 0 ? 1.15 : build.clutch === 1 ? 1.85 : 3.3) * (build.clutch ? life : 1);
   const dumpMul = build.clutch === 2 ? 0.72 : build.clutch === 1 ? 0.85 : 1;
-  const axleMul = (build.driveline === 0 ? 1.45 : build.driveline === 1 ? 2.15 : 3.4) * (build.driveline ? life : 1);
+  const axleMul = (build.driveline === 0 ? 1.8 : build.driveline === 1 ? 2.45 : 3.4) * (build.driveline ? life : 1);
   const shiftMul = build.gearbox ? 0.72 : 1;
   const fd = car.finalDrive * (build.gearing ? setup?.fdTrim || 1 : 1);
   const gears = trimmedGears(car, build, setup);
@@ -142,6 +142,11 @@ export function compile(car, build, setup, heat = 0) {
   if (boost > 1.03 && mult >= fuelCap - 0.01) warnings.push("Boost past the fuel cap only adds knock.");
   if (hardware.fragile > 0) warnings.push("Budget parts are on the car. They make a little less power and give up sooner.");
   if (timing > 1.03) warnings.push("Timing is advanced. The sheet looks stronger, and a long hit knocks.");
+  if (peakTq > car.tq * axleMul + 8) {
+    warnings.push(build.driveline >= 2
+      ? "Even the drag axles are past their rating. The launch will snap one."
+      : "The axles are short of this torque. It will leave and then die until the axles are upgraded.");
+  }
 
   const spec = {
     carId: car.id,
@@ -370,7 +375,7 @@ export function step(state, spec, dt, input) {
   if (state.knock > 0.55) tq *= Math.max(0.4, 1 - (state.knock - 0.55));
 
   const axleTorque = tq * spec.gears[0] * spec.finalDrive;
-  if (state.gear === 1 && state.runT < 0.9 && axleTorque > spec.axleNm) {
+  if (state.gear === 1 && axleTorque > spec.axleNm) {
     state.axle = true;
     state.a = 0;
     return state;
