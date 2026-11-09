@@ -1,15 +1,26 @@
-/** Side views. E30, E36, and E46 use the reference photos.
- *  The other chassis stay on the measured outline.
+/** Side views. Every chassis uses a cropped photo of the real car.
  *  Sprites are stored nose-left. The strip asks for face "right".
  */
 
-import { sampleCurve } from "./sim.js?v=8";
-import { TRACES } from "./traces.js?v=8";
+import { sampleCurve } from "./sim.js?v=9";
+import { TRACES } from "./traces.js?v=9";
 
 const PHOTO_PACKS = {
   e30: { file: "e30-stock.png", aspect: 1180 / 382 },
   e36: { file: "e36-stock.png", aspect: 1400 / 431 },
   e46: { file: "e46-stock.png", aspect: 800 / 259 },
+  e39: { file: "e39-stock.png", aspect: 1373 / 445 },
+  e60: { file: "e60-stock.png", aspect: 1333 / 433 },
+  e90: { file: "e90-stock.png", aspect: 975 / 343 },
+  e82: { file: "e82-stock.png", aspect: 1008 / 361 },
+  e92: { file: "e92-stock.png", aspect: 956 / 332 },
+  f80: { file: "f80-stock.png", aspect: 1160 / 412 },
+  f87: { file: "f87-stock.png", aspect: 1491 / 543 },
+  g20: { file: "g20-stock.png", aspect: 1219 / 414 },
+  f90: { file: "f90-stock.png", aspect: 1091 / 380 },
+  f92: { file: "f92-stock.png", aspect: 1397 / 634 },
+  g80: { file: "g80-stock.png", aspect: 1343 / 598 },
+  g87: { file: "g87-stock.png", aspect: 1316 / 568 },
 };
 
 const spriteListeners = new Set();
@@ -40,7 +51,7 @@ function loadSprite(entry) {
   img.onload = done;
   img.onerror = done;
   img.decoding = "async";
-  img.src = new URL(`../assets/cars/${entry.file}?v=8`, import.meta.url).href;
+  img.src = new URL(`../assets/cars/${entry.file}?v=9`, import.meta.url).href;
   entry.img = img;
   entry.tints = new Map();
   if (img.complete) done();

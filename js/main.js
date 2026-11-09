@@ -16,10 +16,10 @@ import {
   tierNote,
   tierPrice,
   unmetRequires,
-} from "./data.js?v=8";
-import { beep, breakSound, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=8";
-import { artKind, partFigure } from "./art.js?v=8";
-import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=8";
+} from "./data.js?v=9";
+import { beep, breakSound, engineRpm, isMuted, setMuted, stopEngine } from "./audio.js?v=9";
+import { artKind, partFigure } from "./art.js?v=9";
+import { cameraFor, drawCar, drawDyno, drawStrip, onCarSprites, spriteHeight } from "./draw.js?v=9";
 import {
   EIGHTH,
   FT1000,
@@ -34,8 +34,8 @@ import {
   bestSetup,
   simulate,
   step,
-} from "./sim.js?v=8";
-import { clearSave, readSave, writeSave } from "./save.js?v=8";
+} from "./sim.js?v=9";
+import { clearSave, readSave, writeSave } from "./save.js?v=9";
 
 let storageBlocked = false;
 let keepState = "fresh";

@@ -2,7 +2,7 @@
 
 A BMW-only drag racing game. You start in a 2008 335i, tune it the way the real platforms are tuned, and race other BMWs.
 
-E30, E36, and E46 side views stay on the stock photo. A paint chip lays that color over the body. The other chassis are original outlines scaled from published length, height, and wheelbase. This is not a BMW product, and it does not use BMW's artwork or 3D models.
+Every car uses a cropped side photo of the real car. A paint chip lays that color over the body. Photo credits are in `assets/cars/SOURCES.md`. This is not a BMW product, and it does not use BMW's artwork or 3D models.
 
 ## Play
 
@@ -23,7 +23,7 @@ The server prints a local address. Open that address in the same machine’s bro
 - **Slips** keeps each pass as a timeslip.
 - **Lot** sells the rest of the roster. Prices are game money.
 
-On the strip every car points downtrack. In the lot every car points the same way, nose to the left. The other chassis keep their own nose, greenhouse, and deck.
+On the strip every car points downtrack. In the lot every car points the same way, nose to the left.
 
 A red light loses. Power past the fuel system or the bottom end knocks, and an axle that is too small breaks on the hit.
 
